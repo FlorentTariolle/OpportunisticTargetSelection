@@ -293,7 +293,13 @@ Lock-in occurs early: SimBA switches at a median of 12.5 iterations (mean 44.2, 
 
 **Figure 9: Lock-match rate by model.** SimBA consistently locks the oracle class more often than Square Attack, with both methods showing highest match rates on deeper models.
 
-Mismatch does not imply failure. OT achieves high success rates (82.5% SimBA, 97.5% Square Attack) even with lock-match rates around 60%, confirming that the heuristic does not need the "correct" class—it only needs *a viable* class.
+Mismatch does not imply failure. Despite lock-match rates around 60%, OT closes nearly the entire gap between untargeted and oracle performance: SimBA goes from 74.0% (untargeted) to 82.5% (OT) vs. 84.0% (oracle), and Square Attack from 95.0% to 97.5% vs. 98.5%. Since the oracle itself requires *a priori* target knowledge that is unavailable in practice, OT's near-oracle performance with only 60% lock-match confirms that the heuristic does not need the oracle class — it only needs *a viable* class whose decision boundary is reachable.
+
+**Lock-match correlation with savings.** On the 50-image benchmark (10K budget, 4 models), lock-match correlates significantly with query savings: matched runs save 6.8% on average while mismatched runs cost 26.4% more (point-biserial $r = 0.31$, $p < 10^{-5}$). On the 100-image benchmark (ResNet-50 only, 15K budget), this correlation vanishes ($r = -0.04$, $p = 0.68$): both matched and mismatched runs achieve comparable savings (~20–25%). The two benchmarks differ in multiple ways — budget, model composition, and Square Attack's budget-dependent patch schedule (Section 3.6) — so the source of this difference cannot be isolated. Nevertheless, the key finding holds across both settings: mismatched locks do not prevent OT from succeeding.
+
+![Lock-match correlation](results/figures_lockmatch/fig_lockmatch_correlation.png)
+
+**Figure 10: Per-image savings by lock-match.** Left: 50-image benchmark (10K budget), where match correlates with savings ($r = 0.31$, $p < 10^{-5}$). Right: 100-image benchmark (15K budget), where the correlation vanishes ($r = -0.04$, ns). Each point is one (image, method) pair where both modes succeed.
 
 ---
 
@@ -319,7 +325,7 @@ Our analysis here is inspired by the angular convergence framework of Gesny et a
 
 ![Theta convergence](results/figures_theta/fig_theta.png)
 
-**Figure 10: Perturbation alignment with oracle direction.** Cosine similarity between attack perturbation $\delta(i)$ and the oracle direction $\delta_{\text{oracle}}$ (the perturbation produced by a targeted attack toward the oracle class). SimBA on ResNet-50, 100 images, 500-iteration budget. Shaded regions show $\pm 1$ standard deviation. The vertical dashed line marks the mean switch iteration.
+**Figure 11: Perturbation alignment with oracle direction.** Cosine similarity between attack perturbation $\delta(i)$ and the oracle direction $\delta_{\text{oracle}}$ (the perturbation produced by a targeted attack toward the oracle class). SimBA on ResNet-50, 100 images, 500-iteration budget. Shaded regions show $\pm 1$ standard deviation. The vertical dashed line marks the mean switch iteration.
 
 The results confirm the margin-surrogate hypothesis. Untargeted perturbations drift quasi-orthogonally to the oracle direction, reaching a terminal cosine similarity of only $0.174 \pm 0.189$ (median $0.190$), corresponding to an angle $\theta \approx 80°$. Opportunistic perturbations, after switching at a mean iteration of $7.3$ (median $7$, range $6$–$15$), rapidly align with $\delta_{\text{oracle}}$, reaching a terminal similarity of $0.865 \pm 0.192$ (median $0.910$, $\theta \approx 30°$). The alignment gap of $0.692$ (50° in angular terms) demonstrates that OT actively redirects the perturbation toward the oracle basin, not just selecting the correct target class.
 
@@ -335,7 +341,7 @@ We sweep $S \in \{2, 3, 5, 8, 10, 12, 15\}$ independently for both attacks on st
 
 ![S ablation](results/figures_ablation_s/fig_ablation_s.png)
 
-**Figure 11: Stability threshold ablation.** Top row: SimBA, bottom row: Square Attack (CE). Left: success rate vs. $S$; right: mean iterations (successful runs) vs. $S$. Dotted lines mark the optimal $S$.
+**Figure 12: Stability threshold ablation.** Top row: SimBA, bottom row: Square Attack (CE). Left: success rate vs. $S$; right: mean iterations (successful runs) vs. $S$. Dotted lines mark the optimal $S$.
 
 **SimBA** ($S \in \{2, \ldots, 15\}$): Success rate is nearly flat, ranging from 84.0% ($S = 2$) to 85.1% ($S = 10$). Mean iterations are similarly stable ($4{,}814$–$4{,}956$). The optimal threshold is $S^*_{\text{SimBA}} = 10$, though the margin over neighboring values is slim. SimBA's greedy coordinate-descent steps produce stable early-iteration rankings, making the heuristic robust to $S$.
 
@@ -406,7 +412,7 @@ Among the few SimBA runs that do succeed, R18 shows a notable efficiency gain: m
 
 ![Robust lock-match](results/figures/robust/fig_lock_match.png)
 
-**Figure 12: Lock-match rate on robust models.** OT rarely locks the oracle class, reflecting the flatter confidence landscape where multiple classes have similar early stability. Despite low lock-match rates, OT's success rates remain comparable to oracle-targeted attacks, suggesting that on robust models the specific target class matters less than on standard models.
+**Figure 13: Lock-match rate on robust models.** OT rarely locks the oracle class, reflecting the flatter confidence landscape where multiple classes have similar early stability. Despite low lock-match rates, OT's success rates remain comparable to oracle-targeted attacks, suggesting that on robust models the specific target class matters less than on standard models.
 
 ### 8.3 Stability Threshold Ablation on Robust Models
 
@@ -414,7 +420,7 @@ We sweep $S \in \{10, 12, 14, 16, 18, 20\}$ on Salman2020Do\_R50 with Square Att
 
 ![Robust S ablation](results/figures_ablation_s_robust/fig_ablation_s_robust.png)
 
-**Figure 13: Robust model ablation** (Salman2020Do\_R50, 50 images, SquareAttack CE). Left: Success rate vs. $S$. Opportunistic (green) is flat at 58% across all $S$ values, matching oracle-targeted (orange, 58%) and exceeding untargeted (blue, 56%) by 2 pp. Right: Mean iterations (successful runs only). Opportunistic ranges from 421–569 iterations depending on $S$, higher than untargeted (290). Dotted line marks optimal $S = 10$.
+**Figure 14: Robust model ablation** (Salman2020Do\_R50, 50 images, SquareAttack CE). Left: Success rate vs. $S$. Opportunistic (green) is flat at 58% across all $S$ values, matching oracle-targeted (orange, 58%) and exceeding untargeted (blue, 56%) by 2 pp. Right: Mean iterations (successful runs only). Opportunistic ranges from 421–569 iterations depending on $S$, higher than untargeted (290). Dotted line marks optimal $S = 10$.
 
 **Increasing $S$ does not change the picture.** Success rate is flat at 58% for all $S \in \{10, 20\}$. The +2 pp advantage over untargeted is consistent but small. Mean iterations show minor variance with $S$ but no systematic trend. This confirms that the neutrality of targeting on robust models is not an artifact of threshold tuning.
 
