@@ -6,7 +6,7 @@
 
 Black-box adversarial attacks that minimize only the ground-truth confidence suffer from *latent-space drift*: perturbations wander through the feature space without committing to a specific adversarial class, wasting queries on diffuse, undirected progress. We introduce **Opportunistic Targeting (OT)**, a lightweight wrapper that monitors the rank stability of the leading non-true class during an untargeted attack and dynamically switches to a targeted objective once a stable candidate emerges. OT requires no architectural modification to the underlying attack, no gradient access, and no *a priori* target-class knowledge.
 
-We validate OT on two representative score-based attacks, SimBA and Square Attack (cross-entropy loss), across four standard ImageNet classifiers (50-image benchmark, 1,200 runs). OT closely tracks oracle performance, improving SimBA success rate from 74% to 82.5% (oracle: 84%) and reducing mean iterations by 7.1% ($p < 10^{-9}$, Wilcoxon). Benefits scale with model depth (up to 34% query reduction on ResNet-50) and are confirmed on a 100-image benchmark with bootstrapped confidence intervals: OT closes the gap between untargeted and oracle success rates across the full query-budget range.
+We validate OT on two representative score-based attacks, SimBA and Square Attack (cross-entropy loss), across four standard ImageNet classifiers (50-image benchmark, 1,200 runs). OT closely tracks oracle performance, improving SimBA success rate from 74% to 82.5% (oracle: 84%) and delivering 5.6% paired query savings on images where both modes succeed ($p < 10^{-9}$, Wilcoxon). Benefits scale with model depth (up to 34% query reduction on ResNet-50) and are confirmed on a 100-image benchmark with bootstrapped confidence intervals: OT closes the gap between untargeted and oracle success rates across the full query-budget range.
 
 On adversarially-trained models, targeting mode has no statistically significant effect on either success rate or query efficiency. This neutrality holds across both models, both methods, and all tested stability thresholds, suggesting that robust loss landscapes offer no advantage to directional commitment over untargeted exploration.
 
@@ -54,7 +54,7 @@ Square Attack (Andriushchenko et al., 2020) uses random square-shaped patches at
 
 ### 2.2 Decision-Based and Transfer Attacks
 
-Decision-based attacks require only the top-1 label, not the full score vector. Recent work in this space focuses on geometric constructions: SurFree (Maho et al., 2021) uses random 2-D hyperplane search, and Gesny et al. (2024) show theoretically that reintroducing gradient estimation into SurFree (yielding CGBA) accelerates convergence of the angle $\theta(i)$ between the current perturbation direction and the optimal adversarial direction. This is structurally analogous to OT: where CGBA reintroduces directional information (gradient) into a blind geometric process, OT reintroduces directional information (target locking) into a blind score-based process. We formalize this parallel in Section 6.3 using the same angular convergence framework.
+Decision-based attacks require only the top-1 label, not the full score vector. Recent work in this space focuses on geometric constructions: SurFree (Maho et al., 2021) uses random 2-D hyperplane search, and Gesny et al. (2024) show theoretically that reintroducing gradient estimation into SurFree (yielding CGBA) accelerates convergence of the angle $\theta(i)$ between the current perturbation direction and the optimal adversarial direction. This is loosely analogous to OT: both methods reintroduce directional information into a blind search process. The mechanisms differ in granularity — CGBA uses continuous gradient estimates updated at every iteration, while OT uses a discrete, one-time class identity lock — but the effect is similar: the perturbation converges faster toward a specific adversarial direction. We adopt the same angular convergence framework in Section 6.3 to quantify this effect empirically.
 
 ### 2.3 Attacks on Robust Models
 
@@ -88,7 +88,7 @@ A targeted attack toward class $t$ optimizes:
 
 $$\mathcal{L}_{\text{targeted}}(x', t) = -P(t | x') \quad \text{(SimBA)} \qquad \text{or} \qquad \mathcal{L}_{\text{targeted}}(x', t) = \log P(t | x') \quad \text{(CE)}$$
 
-Targeting eliminates drift but requires knowing $t$ in advance. An *oracle* target, i.e. the class that the unconstrained untargeted attack eventually reaches, provides an upper bound on targeted performance that no real attacker can achieve.
+Targeting eliminates drift but requires knowing $t$ in advance. An *oracle* target, i.e. the class that the unconstrained untargeted attack eventually reaches, provides a trajectory-specific performance ceiling that no real attacker can achieve (see Section 4.2 for a precise definition).
 
 ### 3.4 Opportunistic Targeting Algorithm
 
@@ -181,16 +181,16 @@ Each (model, attack, image) triplet is evaluated in three modes:
 | Mode | Description |
 | ------ | ------------- |
 | **Untargeted** | Standard attack with no directional guidance. |
-| **Targeted (oracle)** | Upper bound: target class chosen *a posteriori* from the untargeted result. |
+| **Targeted (oracle)** | Trajectory-specific ceiling: target class chosen *a posteriori* from the untargeted result. |
 | **Opportunistic** | Our method: lock onto the leading non-true class once rank-stability threshold $S$ is reached. |
 
-The oracle target is the class that the untargeted attack converges to (i.e., the final predicted class after misclassification). This represents an upper bound on targeted performance: the oracle runs a targeted attack toward the class that is empirically most accessible for that specific image, which no real attacker could know *a priori*. Note that this oracle represents the best target *for that particular attack trajectory*, not necessarily the globally optimal target across all possible perturbation paths.
+The oracle target is the class that the untargeted attack converges to (i.e., the final predicted class after misclassification), determined by running a probe untargeted attack with the same random seed. This represents a *trajectory-specific* ceiling on targeted performance: the oracle runs a targeted attack toward the class that the untargeted attack's own random search naturally discovered, which no real attacker could know *a priori*. Importantly, this oracle is not globally optimal — a different random seed or a geometry-based target selection (e.g., nearest decision boundary) might yield a more efficient target. We use it because it provides a reproducible, attack-specific reference point: it is the best target *for the perturbation path that the attack would have followed*.
 
 ### 4.3 Configuration
 
 - **Perturbation budget:** $\epsilon = 8/255 \approx 0.031$ in $[0, 1]$ pixel space ($L_\infty$ norm). This is the standard ImageNet adversarial benchmark setting.
 - **Query budget:** 10,000 iterations for both attacks (50-image benchmark) and 15,000 iterations (100-image winrate benchmark).
-- **Stability threshold:** $S = 5$ for SimBA and $S = 8$ for Square Attack on standard models (validated by ablation, Section 7.1), $S = 10$ for both methods on robust models.
+- **Stability threshold:** $S = 10$ for SimBA and $S = 8$ for Square Attack on standard models (validated by ablation, Section 7.1), $S = 10$ for both methods on robust models.
 
 ### 4.4 Images
 
@@ -200,7 +200,14 @@ The oracle target is the class that the untargeted attack converges to (i.e., th
 
 ### 4.5 Metrics
 
-The primary metric is **success rate** (higher is better): at equal query budgets, the attack that misclassifies more images wins. As a secondary metric, we report **iterations to success** (lower is better) to measure query efficiency among successful runs. Following Ughi et al. (2021), we also report **success rate as a function of query budget** (CDF curves), which captures the full distribution of attack difficulty rather than reducing it to a single threshold.
+The primary metric is **success rate** (higher is better): at equal query budgets, the attack that misclassifies more images wins. Following Ughi et al. (2021), we also report **success rate as a function of query budget** (CDF curves), which captures the full distribution of attack difficulty rather than reducing it to a single threshold.
+
+As secondary metrics we report two variants of iteration counts, which capture distinct effects:
+
+- **Censored mean iterations** (all runs): failed runs are assigned the budget ceiling (10K or 15K). This composite metric reflects *both* efficiency gains and success-rate gains: a mode that rescues more runs mechanically lowers the censored mean by replacing 10K-capped failures with finite counts.
+- **Paired mean iterations** (both-succeed subset): restricted to images where *both* modes succeed, isolating pure query-efficiency differences from success-rate effects.
+
+Both are informative: the censored mean captures OT's total practical value (faster *and* more successful), while the paired mean isolates the efficiency mechanism.
 
 ### 4.6 Budget Censoring
 
@@ -232,13 +239,15 @@ The 50-image benchmark across all four models confirms this pattern holds beyond
 
 **Figure 3: Success rate vs. query budget** (50-image benchmark, all 4 standard models pooled). Left: SimBA; right: Square Attack (CE). OT (green) closely tracks oracle (orange) across the full budget range, with the gap between untargeted (blue) and OT widening as the budget increases.
 
-### 5.3 Mean Iterations to Success
+### 5.3 Iteration Efficiency
 
 ![Headline bars](results/figures/standard/fig_headline_bars.png)
 
-**Figure 4: Mean iterations by attack mode** (1,200 runs: 50 images × 4 models × 2 attacks × 3 modes). Error bars show 95% bootstrap CI. Significance brackets show Bonferroni-corrected Wilcoxon tests (pooled across models).
+**Figure 4: Censored mean iterations by attack mode** (1,200 runs: 50 images × 4 models × 2 attacks × 3 modes; failed runs assigned 10K ceiling). Error bars show 95% bootstrap CI. Significance brackets show Bonferroni-corrected Wilcoxon tests (pooled across models).
 
-For SimBA, OT reduces mean iterations by 7.1% (4,454 → 4,137), landing within 2.8% of the oracle (4,023). This reduction is highly significant (pooled Wilcoxon $p < 10^{-9}$, Bonferroni-corrected). For Square Attack (CE loss), the reduction is 26.0% (955 → 707), dominated by ResNet-50 (Section 5.4) where drift is most severe.
+**Censored mean** (all runs, failed = 10K ceiling). For SimBA, OT reduces the censored mean by 7.1% (4,454 → 4,137), landing within 2.8% of the oracle (4,023). This composite reduction is highly significant (pooled Wilcoxon $p < 10^{-9}$, Bonferroni-corrected). For Square Attack (CE loss), the reduction is 26.0% (955 → 707), dominated by ResNet-50 (Section 5.4) where drift is most severe. Note that these censored means reflect *both* efficiency gains and the success-rate gains reported in Section 5.1: OT rescues 17 SimBA runs and 5 Square Attack runs that untargeted fails on, replacing 10K-capped entries with finite counts.
+
+**Paired mean** (both-succeed subset). Restricting to images where both untargeted and OT succeed isolates pure efficiency. SimBA: OT is 5.6% faster (2,506 → 2,365, $N = 148$ paired runs). Square Attack: OT is 18.7% faster (479 → 389, $N = 190$ paired runs). These paired savings are smaller than the censored-mean reductions because the censored metric also absorbs the success-rate improvement.
 
 ![Violin](results/figures/standard/fig_violin.png)
 
@@ -411,7 +420,7 @@ We sweep $S \in \{10, 12, 14, 16, 18, 20\}$ on Salman2020Do\_R50 with Square Att
 
 On standard models, targeting provides clear benefits: it eliminates drift and reduces query counts significantly. On robust models, targeting is neutral: it neither helps nor hurts in any statistically significant way. We hypothesize this is because adversarial training smooths the loss landscape, creating multiple adversarial basins with similar accessibility. In this regime, the directional commitment of targeting offers no advantage over the exploration flexibility of untargeted attacks, because the perturbation can reach a viable adversarial class regardless of whether it is explicitly directed.
 
-This suggests that on robust models, the optimal strategy may be margin-based losses, which implicitly track the nearest competitor at every iteration without committing to a single target. We investigate this further in Issue #12.
+This suggests that on robust models, the optimal strategy may be margin-based losses, which implicitly track the nearest competitor at every iteration without committing to a single target. Whether OT combined with margin loss can improve on either mechanism alone remains an open question (Section 9.4).
 
 ---
 
@@ -421,7 +430,7 @@ This suggests that on robust models, the optimal strategy may be margin-based lo
 
 We introduced Opportunistic Targeting, a wrapper that adds dynamic target selection to any score-based black-box adversarial attack. The key findings are:
 
-1. **Near-oracle efficiency with zero prior knowledge.** On standard ImageNet classifiers, OT lands within 3% of an oracle that knows the optimal target class in advance, reducing mean queries by 7.1% for SimBA ($p < 10^{-9}$, Wilcoxon) and 26% for Square Attack (CE loss).
+1. **Near-oracle efficiency with zero prior knowledge.** On standard ImageNet classifiers, OT lands within 3% of an oracle that knows the optimal target class in advance. On images where both modes succeed, OT provides 5.6% paired query savings for SimBA ($p < 10^{-9}$, Wilcoxon) and 18.7% for Square Attack (CE loss). Including rescued failures (censored mean), the composite reductions are 7.1% and 26%, respectively.
 
 2. **Difficulty-scaled benefits.** OT's savings correlate positively with attack difficulty ($r = 0.19$, $p < 0.001$). On ResNet-50, the deepest and hardest-to-attack model, savings reach 17% (SimBA) and 34% (Square Attack).
 
