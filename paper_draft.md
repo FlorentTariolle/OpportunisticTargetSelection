@@ -249,6 +249,8 @@ The 50-image benchmark across all four models confirms this pattern holds beyond
 
 **Paired mean** (both-succeed subset). Restricting to images where both untargeted and OT succeed isolates pure efficiency. SimBA: OT is 5.6% faster (2,506 → 2,365, $N = 148$ paired runs). Square Attack: OT is 18.7% faster (479 → 389, $N = 190$ paired runs). These paired savings are smaller than the censored-mean reductions because the censored metric also absorbs the success-rate improvement.
 
+**Statistical significance by attack.** SimBA's pooled Wilcoxon test is highly significant ($p < 10^{-9}$). For Square Attack on the 50-image benchmark, the per-model tests are not significant: three of four models (AlexNet, VGG-16, ResNet-18) solve in fewer than 100 iterations regardless of mode, creating a floor effect that leaves no room for OT to improve. The 100-image benchmark on ResNet-50 (15K budget), which eliminates this floor, recovers strong significance: Wilcoxon $p < 10^{-8}$, with a 54% mean iteration reduction (4,461 → 2,055, $N = 100$). This confirms that OT's benefit for Square Attack is real but concentrated on harder model-attack combinations.
+
 ![Violin](results/figures/standard/fig_violin.png)
 
 **Figure 5: Query distribution** (log scale). Untargeted (blue) vs. Opportunistic (red). Dashed lines show medians.
