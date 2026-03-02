@@ -434,9 +434,13 @@ We sweep $S \in \{10, 12, 14, 16, 18, 20\}$ on Salman2020Do\_R50 with Square Att
 
 ### 8.4 Interpretation
 
-On standard models, targeting provides clear benefits: it eliminates drift and reduces query counts significantly. On robust models, targeting is neutral: it neither helps nor hurts in any statistically significant way. We hypothesize this is because adversarial training smooths the loss landscape, creating multiple adversarial basins with similar accessibility. In this regime, the directional commitment of targeting offers no advantage over the exploration flexibility of untargeted attacks, because the perturbation can reach a viable adversarial class regardless of whether it is explicitly directed.
+On standard models, targeting provides clear benefits: it eliminates drift and reduces query counts significantly. On robust models, targeting is neutral: it neither helps nor hurts in any statistically significant way. The explanation lies in the **difficulty distribution**, not landscape smoothing.
 
-This suggests that on robust models, the optimal strategy may be margin-based losses, which implicitly track the nearest competitor at every iteration without committing to a single target. Whether OT combined with margin loss can improve on either mechanism alone remains an open question (Section 9.4).
+On standard ResNet-50, images span a range of difficulties: 20 succeed in fewer than 100 iterations regardless of mode, 16–22 require 100–5,000 iterations (the "medium" zone), and 3–10 fail at the budget ceiling depending on mode. Targeting converts failures into successes — untargeted fails on 10 images while oracle-targeted fails on only 3. This "medium" zone is where directional commitment pays off.
+
+On robust ResNet-50, the difficulty distribution is **bimodal**: 19 images succeed in fewer than 100 iterations and 21–22 fail at the budget ceiling, with only 9–10 in the medium zone. Critically, the failure set is nearly identical across all three modes (22 untargeted, 21 targeted, 21 opportunistic). Targeting cannot rescue these images because they are genuinely infeasible at $\epsilon = 8/255$, not merely inefficient. There is no medium-difficulty zone where directional commitment could make a difference.
+
+To test whether this bimodality reflects a measurable difference in the confidence landscape, we re-ran Square Attack (CE loss) on 100 images for both models, saving full per-iteration confidence histories ($N = 400$ runs). We compared three landscape metrics between standard and robust models: top-10 class-distribution entropy, top-1 class ranking volatility, and the confidence gap between the locked class and the runner-up at lock-in time. None showed a significant difference (Mann-Whitney $p > 0.05$ for all three). The landscapes are not measurably "smoother" — rather, adversarial training compresses the difficulty spectrum into two extremes, eliminating the regime where targeting provides value.
 
 ---
 
@@ -454,7 +458,7 @@ We introduced Opportunistic Targeting, a wrapper that adds dynamic target select
 
 4. **Structural equivalence to margin loss.** The CE-loss ablation on Square Attack confirms that OT functions as a structural surrogate for margin-based losses. When the loss already provides implicit target tracking (margin loss), OT is redundant. When it does not (CE loss, SimBA), OT restores near-optimal directionality.
 
-5. **Targeting neutrality on robust networks.** On adversarially-trained models, targeting mode has no statistically significant effect on success rate or query efficiency (all Bonferroni-corrected $p > 0.09$). This holds across both models, both methods, and all tested stability thresholds ($S \in \{10, 20\}$), suggesting that robust loss landscapes offer no advantage to directional commitment.
+5. **Targeting neutrality on robust networks.** On adversarially-trained models, targeting mode has no statistically significant effect on success rate or query efficiency (all Bonferroni-corrected $p > 0.09$). This holds across both models, both methods, and all tested stability thresholds ($S \in \{10, 20\}$). Per-iteration landscape analysis ($N = 400$ runs) reveals that the neutrality stems from a bimodal difficulty distribution — images are either trivially easy or infeasible at $\epsilon = 8/255$ — rather than from landscape smoothing.
 
 ### 9.2 Limitations
 

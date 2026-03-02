@@ -1,0 +1,34 @@
+{
+  "source": "standard",
+  "model": "resnet50",
+  "image": "ILSVRC2012_val_00001964.JPEG",
+  "mode": "untargeted",
+  "budget": 10000,
+  "stability_threshold": 8,
+  "iterations": 1,
+  "success": true,
+  "adversarial_class": 67,
+  "true_label": 68,
+  "switch_iteration": null,
+  "locked_class": null,
+  "confidence_history": {
+    "iterations": [
+      0,
+      1
+    ],
+    "original_class": [
+      0.25410380959510803,
+      0.25410380959510803
+    ],
+    "max_other_class": [
+      0.28191232681274414,
+      0.28191232681274414
+    ],
+    "max_other_class_id": [
+      67,
+      67
+    ],
+    "top_classes": []
+  },
+  "timestamp": "2026-03-01T14:42:26.134012"
+}

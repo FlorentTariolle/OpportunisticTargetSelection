@@ -1,0 +1,34 @@
+{
+  "source": "robust",
+  "model": "Salman2020Do_R50",
+  "image": "ILSVRC2012_val_00000440.JPEG",
+  "mode": "untargeted",
+  "budget": 10000,
+  "stability_threshold": 10,
+  "iterations": 1,
+  "success": true,
+  "adversarial_class": 85,
+  "true_label": 86,
+  "switch_iteration": null,
+  "locked_class": null,
+  "confidence_history": {
+    "iterations": [
+      0,
+      1
+    ],
+    "original_class": [
+      0.19561003148555756,
+      0.19561003148555756
+    ],
+    "max_other_class": [
+      0.21885505318641663,
+      0.21885505318641663
+    ],
+    "max_other_class_id": [
+      85,
+      85
+    ],
+    "top_classes": []
+  },
+  "timestamp": "2026-03-01T21:42:48.295171"
+}
