@@ -230,8 +230,8 @@ def main():
         description="Theta convergence analysis (cosine similarity of "
                     "perturbation drift toward oracle)"
     )
-    parser.add_argument('--n-images', type=int, default=20,
-                        help="Number of images (default: 20)")
+    parser.add_argument('--n-images', type=int, default=100,
+                        help="Number of images (default: 100)")
     parser.add_argument('--budget', type=int, default=500,
                         help="Query budget per run (default: 500)")
     parser.add_argument('--image-seed', type=int, default=42,

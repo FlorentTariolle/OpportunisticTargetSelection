@@ -193,8 +193,8 @@ def main():
                         help="Part 1 = first half, Part 2 = second half")
     parser.add_argument('--clear', action='store_true',
                         help="Delete previous CSV results before running")
-    parser.add_argument('--n-images', type=int, default=100,
-                        help="Number of images to use (default: 100)")
+    parser.add_argument('--n-images', type=int, default=75,
+                        help="Number of images to use (default: 75)")
     parser.add_argument('--image-seed', type=int, default=42,
                         help="Seed for image selection (default: 42)")
     args = parser.parse_args()
