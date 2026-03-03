@@ -38,9 +38,9 @@ This paper makes three contributions:
 
 2. **Empirical validation** on standard ImageNet classifiers showing that OT provides near-oracle efficiency with zero *a priori* target knowledge, with benefits that scale predictably with model depth.
 
-3. **A characterization of OT's failure mode** on adversarially-trained models, where flat confidence landscapes produce semantically plausible decoy targets that mislead the stability heuristic.
+3. **A characterization of targeting neutrality** on adversarially-trained models, where a bimodal difficulty distribution — images are either trivially easy or infeasible at the tested $\epsilon$ — eliminates the medium-difficulty regime where directional commitment provides value.
 
-The remainder of this paper is organized as follows. Section 2 surveys related work on query-efficient black-box attacks. Section 3 describes the OT algorithm and its integration with SimBA and Square Attack. Section 4 details the experimental setup. Section 5 presents results on standard networks. Section 6 formalizes the connection between OT and margin-based losses. Section 7 reports ablation studies on the stability threshold and loss function. Section 8 extends the analysis to adversarially-trained models. Section 9 concludes.
+The remainder of this paper is organized as follows. Section 2 surveys related work on query-efficient black-box attacks. Section 3 describes the OT algorithm and its integration with SimBA and Square Attack. Section 4 details the experimental setup. Section 5 presents results on standard networks. Section 6 formalizes the connection between OT and margin-based losses. Section 7 reports ablation studies on the stability threshold, loss function, and heuristic choice. Section 8 extends the analysis to adversarially-trained models. Section 9 concludes.
 
 ---
 
