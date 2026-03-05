@@ -30,7 +30,8 @@ class _OpportunisticSquare(torchattacks.Square):
                  opportunistic=False, stability_threshold=30,
                  targeted_mode=False, target_class=None,
                  early_stop=True, loss='margin', normalize=True,
-                 seed=0, reference_direction=None, x_orig=None):
+                 seed=0, reference_direction=None, x_orig=None,
+                 naive_switch_iteration=None):
         super().__init__(
             model,
             norm='Linf',
@@ -57,6 +58,7 @@ class _OpportunisticSquare(torchattacks.Square):
 
         self._reference_direction = reference_direction
         self._x_orig = x_orig
+        self._naive_switch_iteration = naive_switch_iteration
         # Precompute flat reference direction
         self._ref_flat = None
         if reference_direction is not None:
@@ -163,6 +165,8 @@ class _OpportunisticSquare(torchattacks.Square):
                     confidence_history['top_classes'].append(top10_conf)
 
             # Helper: opportunistic stability check after an accepted perturbation
+            naive_switch_iter = self._naive_switch_iteration
+
             def _check_stability(x_img, iteration):
                 nonlocal switched_to_targeted, stability_counter, prev_max_class
                 nonlocal is_targeted, locked_target
@@ -173,7 +177,14 @@ class _OpportunisticSquare(torchattacks.Square):
                 probs_excl = probs[0].clone()
                 probs_excl[y_true] = -1.0
                 current_max_class = torch.argmax(probs_excl).item()
-                if prev_max_class is not None and current_max_class == prev_max_class:
+                if naive_switch_iter is not None and iteration >= naive_switch_iter:
+                    is_targeted = True
+                    locked_target = current_max_class
+                    switched_to_targeted = True
+                    confidence_history['switch_iteration'] = iteration
+                    confidence_history['locked_class'] = current_max_class
+                    self.targeted = True
+                elif naive_switch_iter is None and prev_max_class is not None and current_max_class == prev_max_class:
                     stability_counter += 1
                     if stability_counter >= stability_threshold:
                         is_targeted = True
@@ -341,6 +352,7 @@ class SquareAttack(BaseAttack):
         opportunistic: bool = False,
         stability_threshold: int = 30,
         reference_direction: Optional[torch.Tensor] = None,
+        naive_switch_iteration: Optional[int] = None,
         **kwargs,
     ) -> torch.Tensor:
         """Generate adversarial examples using Square Attack.
@@ -415,6 +427,7 @@ class SquareAttack(BaseAttack):
                 seed=self.seed_value,
                 reference_direction=reference_direction,
                 x_orig=xi,
+                naive_switch_iteration=naive_switch_iteration,
             )
 
             if targeted:

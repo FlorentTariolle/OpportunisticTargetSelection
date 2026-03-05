@@ -57,6 +57,7 @@ class SimBA(BaseAttack):
         opportunistic: bool = False,
         stability_threshold: int = 30,
         reference_direction: Optional[torch.Tensor] = None,
+        naive_switch_iteration: Optional[int] = None,
         **kwargs
     ) -> torch.Tensor:
         """Generate adversarial examples using SimBA.
@@ -107,7 +108,7 @@ class SimBA(BaseAttack):
             result = self._attack_single_image(
                 x[0], y[0], track_confidence=True, targeted=targeted, target_class=t_class,
                 early_stop=early_stop, opportunistic=opportunistic, stability_threshold=stability_threshold,
-                reference_direction=reference_direction
+                reference_direction=reference_direction, naive_switch_iteration=naive_switch_iteration,
             )
             if isinstance(result, tuple) and len(result) == 2:
                 x_adv[0], self.confidence_history = result
@@ -122,7 +123,7 @@ class SimBA(BaseAttack):
                 warnings.warn(f"track_confidence=True is only supported for batch_size=1. Got batch_size={batch_size}. Confidence tracking disabled.")
             for i in range(batch_size):
                 t_class = target_class[i] if targeted else None
-                result = self._attack_single_image(x[i], y[i], track_confidence=False, targeted=targeted, target_class=t_class, early_stop=early_stop, opportunistic=opportunistic, stability_threshold=stability_threshold, reference_direction=reference_direction)
+                result = self._attack_single_image(x[i], y[i], track_confidence=False, targeted=targeted, target_class=t_class, early_stop=early_stop, opportunistic=opportunistic, stability_threshold=stability_threshold, reference_direction=reference_direction, naive_switch_iteration=naive_switch_iteration)
                 if isinstance(result, tuple):
                     x_adv[i] = result[0]
                 else:
@@ -141,6 +142,7 @@ class SimBA(BaseAttack):
         opportunistic: bool = False,
         stability_threshold: int = 30,
         reference_direction: Optional[torch.Tensor] = None,
+        naive_switch_iteration: Optional[int] = None,
     ) -> tuple:
         """Attack a single image.
 
@@ -332,7 +334,15 @@ class SimBA(BaseAttack):
                     probs_excluding_true = probs_candidate[0].clone()
                     probs_excluding_true[y_true] = -1.0
                     current_max_class = torch.argmax(probs_excluding_true).item()
-                    if prev_max_class is not None and current_max_class == prev_max_class:
+                    if naive_switch_iteration is not None and iteration + 1 >= naive_switch_iteration:
+                        targeted = True
+                        target_class = torch.tensor(current_max_class, device=self.device)
+                        current_target_conf = probs_candidate[0][target_class].item()
+                        switched_to_targeted = True
+                        switch_iteration = iteration + 1
+                        confidence_history['switch_iteration'] = switch_iteration
+                        confidence_history['locked_class'] = current_max_class
+                    elif naive_switch_iteration is None and prev_max_class is not None and current_max_class == prev_max_class:
                         stability_counter += 1
                         if stability_counter >= stability_threshold:
                             targeted = True
@@ -364,7 +374,15 @@ class SimBA(BaseAttack):
                     probs_excluding_true = probs_candidate[0].clone()
                     probs_excluding_true[y_true] = -1.0
                     current_max_class = torch.argmax(probs_excluding_true).item()
-                    if prev_max_class is not None and current_max_class == prev_max_class:
+                    if naive_switch_iteration is not None and iteration + 1 >= naive_switch_iteration:
+                        targeted = True
+                        target_class = torch.tensor(current_max_class, device=self.device)
+                        current_target_conf = probs_candidate[0][target_class].item()
+                        switched_to_targeted = True
+                        switch_iteration = iteration + 1
+                        confidence_history['switch_iteration'] = switch_iteration
+                        confidence_history['locked_class'] = current_max_class
+                    elif naive_switch_iteration is None and prev_max_class is not None and current_max_class == prev_max_class:
                         stability_counter += 1
                         if stability_counter >= stability_threshold:
                             targeted = True
@@ -430,7 +448,15 @@ class SimBA(BaseAttack):
                     probs_excluding_true = probs_candidate[0].clone()
                     probs_excluding_true[y_true] = -1.0
                     current_max_class = torch.argmax(probs_excluding_true).item()
-                    if prev_max_class is not None and current_max_class == prev_max_class:
+                    if naive_switch_iteration is not None and iteration + 1 >= naive_switch_iteration:
+                        targeted = True
+                        target_class = torch.tensor(current_max_class, device=self.device)
+                        current_target_conf = probs_candidate[0][target_class].item()
+                        switched_to_targeted = True
+                        switch_iteration = iteration + 1
+                        confidence_history['switch_iteration'] = switch_iteration
+                        confidence_history['locked_class'] = current_max_class
+                    elif naive_switch_iteration is None and prev_max_class is not None and current_max_class == prev_max_class:
                         stability_counter += 1
                         if stability_counter >= stability_threshold:
                             targeted = True
@@ -462,7 +488,15 @@ class SimBA(BaseAttack):
                     probs_excluding_true = probs_candidate[0].clone()
                     probs_excluding_true[y_true] = -1.0
                     current_max_class = torch.argmax(probs_excluding_true).item()
-                    if prev_max_class is not None and current_max_class == prev_max_class:
+                    if naive_switch_iteration is not None and iteration + 1 >= naive_switch_iteration:
+                        targeted = True
+                        target_class = torch.tensor(current_max_class, device=self.device)
+                        current_target_conf = probs_candidate[0][target_class].item()
+                        switched_to_targeted = True
+                        switch_iteration = iteration + 1
+                        confidence_history['switch_iteration'] = switch_iteration
+                        confidence_history['locked_class'] = current_max_class
+                    elif naive_switch_iteration is None and prev_max_class is not None and current_max_class == prev_max_class:
                         stability_counter += 1
                         if stability_counter >= stability_threshold:
                             targeted = True
