@@ -26,6 +26,13 @@ N_WORKERS=${N_WORKERS:-10}
 N_IMAGES=100
 CHUNK=$(( (N_IMAGES + N_WORKERS - 1) / N_WORKERS ))
 
+# Start NVIDIA MPS to share a single GPU context across workers.
+# Eliminates CUDA context-switching overhead for multi-process inference.
+export CUDA_MPS_PIPE_DIRECTORY=/tmp/nvidia-mps-${SLURM_JOB_ID}
+export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-mps-log-${SLURM_JOB_ID}
+nvidia-cuda-mps-control -d
+echo "MPS started"
+
 echo "Starting $N_WORKERS workers at $(date)"
 for i in $(seq 0 $((N_WORKERS - 1))); do
     START=$((i * CHUNK))
@@ -35,4 +42,7 @@ for i in $(seq 0 $((N_WORKERS - 1))); do
     python -u benchmark_ablation_naive.py --image-start $START --image-end $END > /dev/null 2>&1 &
 done
 wait
+
+# Stop MPS
+echo quit | nvidia-cuda-mps-control
 echo "All workers finished at $(date)"
