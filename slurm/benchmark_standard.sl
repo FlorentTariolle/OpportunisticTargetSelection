@@ -29,10 +29,18 @@ nvidia-cuda-mps-control -d
 echo "MPS started"
 
 echo "Starting benchmark at $(date)"
-python -u benchmark.py --part 1 --n-images 100 --source standard > /dev/null 2>&1 &
-python -u benchmark.py --part 2 --n-images 100 --source standard > /dev/null 2>&1 &
+# Kill workers after 7h55m so the requeue block has time to run before 8h wall time
+timeout 28500 python -u benchmark.py --part 1 --n-images 100 --source standard > /dev/null 2>&1 &
+timeout 28500 python -u benchmark.py --part 2 --n-images 100 --source standard > /dev/null 2>&1 &
 wait
 
 # Stop MPS
 echo quit | nvidia-cuda-mps-control
 echo "All workers finished at $(date)"
+
+# Auto-requeue if there's still work to do
+TOTAL=$(wc -l < results/benchmark_standard.csv)
+if [ "$TOTAL" -lt 4501 ]; then
+    echo "Only $((TOTAL - 1))/4500 done, resubmitting..."
+    sbatch slurm/benchmark_standard.sl
+fi
