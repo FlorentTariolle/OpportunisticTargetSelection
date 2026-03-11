@@ -230,8 +230,16 @@ def main():
         print(f"Resuming: found {len(existing_keys)} existing results")
 
     # Load model and images
+    # A100 optimizations: TF32 matmul + cuDNN autotuning + torch.compile
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision("high")
+        torch.backends.cudnn.benchmark = True
+
     print(f"\nLoading model: {MODEL_NAME} ({SOURCE})...")
     model = load_benchmark_model(MODEL_NAME, SOURCE, device)
+
+    if torch.cuda.is_available():
+        model = torch.compile(model, mode="reduce-overhead")
 
     print(f"Selecting {args.n_images} images from {VAL_DIR}...")
     image_paths = select_images(VAL_DIR, args.n_images, args.image_seed)
