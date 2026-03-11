@@ -28,10 +28,19 @@ export CUDA_MPS_LOG_DIRECTORY=/tmp/nvidia-mps-log-${SLURM_JOB_ID}
 nvidia-cuda-mps-control -d
 echo "MPS started"
 
-echo "Starting benchmark at $(date)"
+N_WORKERS=${N_WORKERS:-10}
+N_IMAGES=100
+CHUNK=$(( (N_IMAGES + N_WORKERS - 1) / N_WORKERS ))
+
+echo "Starting $N_WORKERS workers at $(date)"
 # Kill workers after 7h55m so the requeue block has time to run before 8h wall time
-timeout 28500 python -u benchmark.py --part 1 --n-images 100 --source standard > /dev/null 2>&1 &
-timeout 28500 python -u benchmark.py --part 2 --n-images 100 --source standard > /dev/null 2>&1 &
+for i in $(seq 0 $((N_WORKERS - 1))); do
+    START=$((i * CHUNK))
+    END=$(( (i + 1) * CHUNK ))
+    [ $END -gt $N_IMAGES ] && END=$N_IMAGES
+    [ $START -ge $N_IMAGES ] && continue
+    timeout 28500 python -u benchmark.py --image-start $START --image-end $END --source standard > /dev/null 2>&1 &
+done
 wait
 
 # Stop MPS

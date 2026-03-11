@@ -3,15 +3,14 @@
 Runs SimBA and SquareAttack (CE loss) across multiple models on ImageNet
 validation images in three modes: untargeted, targeted-oracle, and opportunistic.
 
-Split by images for parallel execution:
-  --part 1  runs first half of images
-  --part 2  runs second half of images
+Split by image ranges for parallel execution:
+  --image-start 0 --image-end 10   runs images 0-9
 
 Usage:
-    python benchmark.py --part 1 --source standard
-    python benchmark.py --part 2 --source standard
-    python benchmark.py --part 1 --n-images 4          # smoke test
-    python benchmark.py --clear --part 1 --source robust
+    python benchmark.py --image-start 0 --image-end 50 --source standard
+    python benchmark.py --image-start 50 --image-end 100 --source standard
+    python benchmark.py --image-start 0 --image-end 4   # smoke test
+    python benchmark.py --clear --image-start 0 --image-end 50 --source robust
 """
 
 import argparse
@@ -573,13 +572,15 @@ def compute_summary_statistics(csv_path: Path):
 # ===========================================================================
 def main():
     parser = argparse.ArgumentParser(description="Run adversarial attack benchmark")
-    parser.add_argument('--part', type=int, required=True, choices=[1, 2],
-                        help="Part 1 = first half of images, Part 2 = second half")
+    parser.add_argument('--image-start', type=int, required=True,
+                        help="Start index of image range (inclusive)")
+    parser.add_argument('--image-end', type=int, required=True,
+                        help="End index of image range (exclusive)")
     parser.add_argument('--clear', action='store_true', help="Delete previous CSV results before running")
     parser.add_argument('--source', choices=['standard', 'robust'], default='standard',
                         help="Model source: 'standard' for torchvision, 'robust' for RobustBench")
-    parser.add_argument('--n-images', type=int, default=50,
-                        help="Number of images to use (default: 50)")
+    parser.add_argument('--n-images', type=int, default=100,
+                        help="Number of images to use (default: 100)")
     parser.add_argument('--image-seed', type=int, default=42,
                         help="Seed for image selection (default: 42)")
     args = parser.parse_args()
@@ -592,18 +593,14 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # Select and split images
+    # Select and slice images
     all_images = select_images(VAL_DIR, args.n_images, args.image_seed)
-    half = args.n_images // 2
-    if args.part == 1:
-        image_paths = all_images[:half]
-    else:
-        image_paths = all_images[half:]
+    image_paths = all_images[args.image_start:args.image_end]
 
     print(f"Device: {device}")
     print(f"Source: {source}")
     print(f"Models: {models}")
-    print(f"Images: {len(image_paths)} (part {args.part} of {args.n_images}, seed={args.image_seed})")
+    print(f"Images: {len(image_paths)} (indices {args.image_start}-{args.image_end} of {args.n_images}, seed={args.image_seed})")
     print(f"Epsilons: {[f'{e:.4f}' for e in EPSILONS]}")
     print(f"Seeds: {SEEDS}")
     print(f"Stability threshold: {STABILITY_THRESHOLD[source]}")
@@ -673,7 +670,7 @@ def main():
 
     elapsed = time.time() - start_time
     print(f"\n{'=' * 80}")
-    print(f"Part {args.part} complete in {elapsed:.0f}s")
+    print(f"Images {args.image_start}-{args.image_end} complete in {elapsed:.0f}s")
     print(f"Results: {csv_path}")
 
     # Generate summary
