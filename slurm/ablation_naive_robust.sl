@@ -37,7 +37,7 @@ for i in $(seq 0 $((N_WORKERS - 1))); do
     END=$(( (i + 1) * CHUNK ))
     [ $END -gt $N_IMAGES ] && END=$N_IMAGES
     [ $START -ge $N_IMAGES ] && continue
-    python -u benchmark_ablation_naive.py --source robust --image-start $START --image-end $END > /dev/null 2>&1 &
+    python -u benchmarks/ablation_naive.py --source robust --image-start $START --image-end $END > /dev/null 2>&1 &
 done
 wait
 

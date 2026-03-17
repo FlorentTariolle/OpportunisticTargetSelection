@@ -24,8 +24,8 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from benchmark import load_benchmark_model, load_benchmark_image, get_true_label
-from benchmark_winrate import (
+from benchmarks.benchmark import load_benchmark_model, load_benchmark_image, get_true_label
+from benchmarks.winrate import (
     select_images, lookup_oracle_targets, determine_oracle_target,
 )
 from src.attacks.simba import SimBA

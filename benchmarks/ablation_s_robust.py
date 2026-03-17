@@ -23,8 +23,8 @@ from pathlib import Path
 import torch
 import torch.nn.functional as F
 
-from benchmark import load_benchmark_model, load_benchmark_image, get_true_label
-from benchmark_winrate import select_images
+from benchmarks.benchmark import load_benchmark_model, load_benchmark_image, get_true_label
+from benchmarks.winrate import select_images
 from src.attacks.square import SquareAttack
 
 # ===========================================================================
