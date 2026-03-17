@@ -28,7 +28,7 @@ from src.attacks.square import SquareAttack
 # ===========================================================================
 # Configuration
 # ===========================================================================
-MODEL_NAME = 'resnet50'
+MODEL_NAMES = {'standard': 'resnet50', 'robust': 'Salman2020Do_R50'}
 EPSILON = 8 / 255
 METHODS = ['SimBA', 'SquareAttack']
 T_VALUES_STANDARD = [5, 10, 20, 50, 100, 200, 500]
@@ -204,6 +204,7 @@ def main():
     args = parser.parse_args()
 
     source = args.source
+    model_name = MODEL_NAMES[source]
     t_values = T_VALUES_STANDARD if source == 'standard' else T_VALUES_ROBUST
     csv_path = RESULTS_DIR / f'benchmark_ablation_naive_{source}.csv'
     methods = METHODS
@@ -211,7 +212,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     print(f"Device: {device}")
-    print(f"Model: {MODEL_NAME} ({source})")
+    print(f"Model: {model_name} ({source})")
     print(f"Epsilon: {EPSILON:.6f} ({EPSILON * 255:.0f}/255)")
     print(f"Methods: {METHODS}")
     print(f"T values: {t_values}")
@@ -237,8 +238,8 @@ def main():
         torch.set_float32_matmul_precision("high")
         torch.backends.cudnn.benchmark = True
 
-    print(f"\nLoading model: {MODEL_NAME} ({source})...")
-    model = load_benchmark_model(MODEL_NAME, source, device)
+    print(f"\nLoading model: {model_name} ({source})...")
+    model = load_benchmark_model(model_name, source, device)
 
     print(f"Selecting {args.n_images} images from {VAL_DIR}...")
     image_paths = select_images(VAL_DIR, args.n_images, args.image_seed)
