@@ -1,11 +1,11 @@
 """Naive fixed-iteration switching ablation.
 
 Compares OT's stability heuristic against a naive baseline that switches to
-targeted at a fixed iteration T (no stability check).  Sweeps T values and
-also runs OT with default S as a baseline.
+targeted at a fixed iteration T (no stability check).
 
 Usage:
-    python benchmark_ablation_naive.py                                    # Full run
+    python benchmark_ablation_naive.py                                    # Standard (T sweep)
+    python benchmark_ablation_naive.py --source robust                   # Robust (T=100 vs OT)
     python benchmark_ablation_naive.py --image-start 0 --image-end 50    # Terminal 1
     python benchmark_ablation_naive.py --image-start 50 --image-end 100  # Terminal 2
     python benchmark_ablation_naive.py --n-images 2                      # Smoke test
@@ -29,15 +29,14 @@ from src.attacks.square import SquareAttack
 # Configuration
 # ===========================================================================
 MODEL_NAME = 'resnet50'
-SOURCE = 'standard'
 EPSILON = 8 / 255
 METHODS = ['SimBA', 'SquareAttack']
-T_VALUES = [5, 10, 20, 50, 100, 200, 500]
+T_VALUES_STANDARD = [5, 10, 20, 50, 100, 200, 500]
+T_VALUES_ROBUST = [100]
 # Default S values for OT baseline (must match benchmark_winrate.py)
 OT_S = {'SimBA': 10, 'SquareAttack': 8}
 VAL_DIR = Path('data/imagenet/val')
 RESULTS_DIR = Path('results')
-CSV_PATH = RESULTS_DIR / 'benchmark_ablation_naive.csv'
 
 CSV_COLUMNS = [
     'method', 't_value', 'image', 'true_label', 'iterations', 'success',
@@ -199,20 +198,23 @@ def main():
                         help="Start index for image slice (default: 0)")
     parser.add_argument('--image-end', type=int, default=None,
                         help="End index for image slice (default: all)")
+    parser.add_argument('--source', type=str, default='standard',
+                        choices=['standard', 'robust'],
+                        help="Model source (default: standard)")
     args = parser.parse_args()
 
+    source = args.source
+    t_values = T_VALUES_STANDARD if source == 'standard' else T_VALUES_ROBUST
+    csv_path = RESULTS_DIR / f'benchmark_ablation_naive_{source}.csv'
     methods = METHODS
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    # t_value='OT' represents the OT baseline
-    all_t_labels = [str(t) for t in T_VALUES] + ['OT']
-
     print(f"Device: {device}")
-    print(f"Model: {MODEL_NAME} ({SOURCE})")
+    print(f"Model: {MODEL_NAME} ({source})")
     print(f"Epsilon: {EPSILON:.6f} ({EPSILON * 255:.0f}/255)")
     print(f"Methods: {METHODS}")
-    print(f"T values: {T_VALUES}")
+    print(f"T values: {t_values}")
     print(f"OT baseline S: {OT_S}")
     print(f"Images: {args.n_images} (seed={args.image_seed}), "
           f"slice [{args.image_start}:{args.image_end}]")
@@ -221,11 +223,11 @@ def main():
 
     RESULTS_DIR.mkdir(exist_ok=True)
 
-    if args.clear and CSV_PATH.exists():
-        CSV_PATH.unlink()
+    if args.clear and csv_path.exists():
+        csv_path.unlink()
         print("Cleared previous results")
 
-    existing_keys = load_existing_keys(CSV_PATH)
+    existing_keys = load_existing_keys(csv_path)
     if existing_keys:
         print(f"Resuming: found {len(existing_keys)} existing results")
 
@@ -235,8 +237,8 @@ def main():
         torch.set_float32_matmul_precision("high")
         torch.backends.cudnn.benchmark = True
 
-    print(f"\nLoading model: {MODEL_NAME} ({SOURCE})...")
-    model = load_benchmark_model(MODEL_NAME, SOURCE, device)
+    print(f"\nLoading model: {MODEL_NAME} ({source})...")
+    model = load_benchmark_model(MODEL_NAME, source, device)
 
     print(f"Selecting {args.n_images} images from {VAL_DIR}...")
     image_paths = select_images(VAL_DIR, args.n_images, args.image_seed)
@@ -254,7 +256,7 @@ def main():
     # Build work queue: T values + OT baseline
     jobs = []
     for method in methods:
-        for t_val in T_VALUES:
+        for t_val in t_values:
             for image_name, x, y_true in images:
                 key = (method, str(t_val), image_name)
                 if key not in existing_keys:
@@ -265,7 +267,7 @@ def main():
             if key not in existing_keys:
                 jobs.append((method, 'OT', None, image_name, x, y_true))
 
-    total_runs = len(methods) * (len(T_VALUES) + 1) * len(images)
+    total_runs = len(methods) * (len(t_values) + 1) * len(images)
     completed = total_runs - len(jobs)
     start_time = time.time()
 
@@ -301,7 +303,7 @@ def main():
             'locked_class': result['locked_class'] if result['locked_class'] is not None else '',
             'timestamp': datetime.now().isoformat(),
         }
-        append_row(row, CSV_PATH)
+        append_row(row, csv_path)
         completed += 1
 
         run_time = time.time() - start_time
@@ -320,7 +322,7 @@ def main():
     elapsed = time.time() - start_time
     print(f"\n{'='*70}")
     print(f"Naive ablation complete in {elapsed:.0f}s")
-    print(f"Results: {CSV_PATH}")
+    print(f"Results: {csv_path}")
     print(f"Completed: {completed} runs")
 
 
