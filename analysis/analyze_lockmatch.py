@@ -51,7 +51,7 @@ def _setup_style():
         plt.rcParams["text.usetex"] = False
 
 
-METHOD_COLORS = {"SimBA": "#4878CF", "SquareAttack": "#D65F5F"}
+METHOD_COLORS = {"SimBA": "#4878CF", "SquareAttack": "#D65F5F", "Bandits": "#6BA353"}
 
 
 # ===========================================================================
@@ -140,7 +140,7 @@ def print_summary(pairs: pd.DataFrame, label: str):
         print(f"    Match savings:    {both[both['lock_match']]['savings'].mean():+.1%}")
         print(f"    Mismatch savings: {both[~both['lock_match']]['savings'].mean():+.1%}")
 
-    for method in ["SimBA", "SquareAttack"]:
+    for method in sorted(both["method"].unique()):
         sub = both[both["method"] == method]
         if len(sub) > 5:
             r, p = pointbiserialr(sub["lock_match"].astype(int), sub["savings"])
@@ -162,7 +162,7 @@ def fig_lockmatch_savings(std_pairs: pd.DataFrame, win_pairs: pd.DataFrame,
         (win_pairs, "100-image benchmark (15K budget)", "15K"),
     ]):
         both = pairs[pairs["success_opp"] & pairs["success_unt"]]
-        methods = ["SimBA", "SquareAttack"]
+        methods = sorted(both["method"].unique())
         x = np.arange(len(methods))
         width = 0.3
 
@@ -203,7 +203,7 @@ def fig_lockmatch_success(std_pairs: pd.DataFrame, win_pairs: pd.DataFrame,
         (std_pairs, "50-image (10K)"),
         (win_pairs, "100-image (15K)"),
     ]):
-        methods = ["SimBA", "SquareAttack"]
+        methods = sorted(both["method"].unique())
         x = np.arange(len(methods))
         width = 0.3
         for j, match_val in enumerate([True, False]):

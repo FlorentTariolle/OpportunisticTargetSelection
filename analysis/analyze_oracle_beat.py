@@ -53,7 +53,7 @@ def _setup_style():
 MODE_ORDER = ["untargeted", "targeted", "opportunistic"]
 
 MODEL_ORDERS = {
-    "standard": ["resnet18", "resnet50", "vgg16", "alexnet"],
+    "standard": ["resnet18", "resnet50", "vgg16", "alexnet", "vit_b_16"],
     "robust": ["Salman2020Do_R18", "Salman2020Do_R50"],
 }
 

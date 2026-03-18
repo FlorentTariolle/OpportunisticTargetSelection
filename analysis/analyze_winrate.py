@@ -79,6 +79,7 @@ MODE_LABELS = {
 METHOD_LABELS = {
     "SimBA": "SimBA",
     "SquareAttack": "Square Attack",
+    "Bandits": "Bandits",
 }
 
 
@@ -215,7 +216,7 @@ def main():
           f"{len(budgets)} points)")
 
     # Process each method independently
-    for method in ["SimBA", "SquareAttack"]:
+    for method in sorted(df["method"].unique()):
         df_method = df[(df["method"] == method) & (df["mode"] != "oracle_probe")]
         n_rows = len(df_method)
         n_images = df_method["image"].nunique()

@@ -82,10 +82,13 @@ COLOR_UNTARGETED = "#4878CF"      # blue
 COLOR_OPPORTUNISTIC = "#D64541"   # red
 LINESTYLE_SIMBA = "-"             # solid
 LINESTYLE_SQUARE = "--"           # dashed
+LINESTYLE_BANDITS = ":"           # dotted
 
-METHOD_MARKERS = {"SimBA": "o", "SquareAttack": "s"}
+METHOD_MARKERS = {"SimBA": "o", "SquareAttack": "s", "Bandits": "D"}
+METHOD_LINESTYLES = {"SimBA": "-", "SquareAttack": "--", "Bandits": ":"}
+METHODS = ["SimBA", "SquareAttack", "Bandits"]
 MODEL_ORDERS = {
-    "standard": ["resnet18", "resnet50", "vgg16", "alexnet"],
+    "standard": ["resnet18", "resnet50", "vgg16", "alexnet", "vit_b_16"],
     "robust": ["Salman2020Do_R18", "Salman2020Do_R50"],
 }
 STABILITY_THRESHOLDS = {"standard": 5, "robust": 10}
@@ -194,7 +197,7 @@ def _annotate_sig_brackets(ax, test_results: pd.DataFrame, model: str | None,
 
 def _pub_label(method: str, mode: str) -> str:
     """Legend label for publication 2-mode figures."""
-    short = "SimBA" if method == "SimBA" else "Square"
+    short = {"SimBA": "SimBA", "SquareAttack": "Square", "Bandits": "Bandits"}.get(method, method)
     tag = "Untargeted" if mode == "untargeted" else "Opportunistic"
     return f"{short} — {tag}"
 
@@ -204,7 +207,7 @@ def _pub_color(mode: str) -> str:
 
 
 def _pub_linestyle(method: str) -> str:
-    return LINESTYLE_SIMBA if method == "SimBA" else LINESTYLE_SQUARE
+    return METHOD_LINESTYLES.get(method, "-")
 
 
 # ===========================================================================
@@ -221,7 +224,7 @@ def fig_headline_bars(df: pd.DataFrame, outdir: str, test_results=None):
     agg["ci"] = ok.groupby(["method", "mode"], observed=True)["iterations"].apply(_ci95)
     agg = agg.reset_index()
 
-    methods = ["SimBA", "SquareAttack"]
+    methods = [m for m in METHODS if m in df["method"].unique()]
     x = np.arange(len(methods))
     width = 0.22
 
@@ -287,7 +290,7 @@ def fig_per_model(df: pd.DataFrame, outdir: str, model_order: list[str],
         print("  Skipping fig_per_model: no successful runs")
         return None
     models = [m for m in model_order if m in ok["model"].unique()]
-    methods = ["SimBA", "SquareAttack"]
+    methods = [m for m in METHODS if m in df["method"].unique()]
 
     with plt.rc_context({"figure.constrained_layout.use": False}):
         fig, axes = plt.subplots(
@@ -372,7 +375,7 @@ def fig_difficulty_vs_savings(df: pd.DataFrame, outdir: str, model_order: list[s
     )
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    for method in ["SimBA", "SquareAttack"]:
+    for method in [m for m in METHODS if m in df["method"].unique()]:
         for model in model_order:
             sub = merged[(merged["method"] == method) & (merged["model"] == model)]
             if sub.empty:
@@ -434,7 +437,7 @@ def fig_lock_match(df: pd.DataFrame, outdir: str, model_order: list[str]):
     )
 
     models = [m for m in model_order if m in match_rate["model"].unique()]
-    methods = ["SimBA", "SquareAttack"]
+    methods = [m for m in METHODS if m in df["method"].unique()]
 
     fig, ax = plt.subplots(figsize=(7, 4.5))
     x = np.arange(len(models))
@@ -516,7 +519,7 @@ def fig_lock_match_robust(df: pd.DataFrame, outdir: str, model_order: list[str])
     )
 
     models = [m for m in model_order if m in match_rate["model"].unique()]
-    methods = ["SimBA", "SquareAttack"]
+    methods = [m for m in METHODS if m in df["method"].unique()]
 
     fig, ax = plt.subplots(figsize=(7, 4.5))
     x = np.arange(len(models))
@@ -576,7 +579,7 @@ def fig_cdf(df: pd.DataFrame, outdir: str):
 
     medians = {}
 
-    for method in ["SimBA", "SquareAttack"]:
+    for method in [m for m in METHODS if m in df["method"].unique()]:
         for mode in ["untargeted", "opportunistic"]:
             group = sub[(sub["method"] == method) & (sub["mode"] == mode)]
             n_total = len(group)
@@ -604,7 +607,7 @@ def fig_cdf(df: pd.DataFrame, outdir: str):
     # Annotate median vertical lines & speedup
     anno_idx = 0
     y_positions = [0.52, 0.40]
-    for method in ["SimBA", "SquareAttack"]:
+    for method in [m for m in METHODS if m in df["method"].unique()]:
         m_unt = medians.get((method, "untargeted"))
         m_opp = medians.get((method, "opportunistic"))
         if m_unt is not None:
@@ -645,7 +648,7 @@ def fig_cdf_per_model(df: pd.DataFrame, outdir: str, model_order: list[str],
     Layout: len(model_order) rows × 2 columns (one per method).
     Each subplot has 3 curves (untargeted, targeted, opportunistic).
     """
-    methods = ["SimBA", "SquareAttack"]
+    methods = [m for m in METHODS if m in df["method"].unique()]
     models = [m for m in model_order if m in df["model"].unique()]
     nrows, ncols = len(models), len(methods)
 
@@ -758,7 +761,7 @@ def fig_violin(df: pd.DataFrame, outdir: str):
     ax.set_xlabel("")
     ax.set_title("Query Distribution: Untargeted vs. Opportunistic")
 
-    for method in ["SimBA", "SquareAttack"]:
+    for method in [m for m in METHODS if m in df["method"].unique()]:
         for mode_val in ["untargeted", "opportunistic"]:
             vals = ok[(ok["Method"] == method) & (ok["mode"] == mode_val)]["iterations"]
             if len(vals):
@@ -861,7 +864,7 @@ def fig_lockin(outdir: str, source: str = "standard", device_str: str = "cuda",
 
     # Pick the best showcase images from benchmark data
     cases = []
-    for method in ["SimBA", "SquareAttack"]:
+    for method in [m for m in METHODS if m in df["method"].unique()]:
         img_name, seed = _best_ot_image(csv_path, model_name, method)
         img_path = _resolve_image_path(img_name)
         short = "Square Attack" if method == "SquareAttack" else method
