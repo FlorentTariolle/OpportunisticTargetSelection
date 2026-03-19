@@ -108,7 +108,7 @@ def select_clean_argmax(model, x, y_true: int) -> int:
 def select_random_target(y_true: int, n_classes: int, seed: int,
                          image_name: str) -> int:
     """Uniform random non-true class, deterministic per (seed, image)."""
-    rng = random.Random((seed, image_name))
+    rng = random.Random(f"{seed}_{image_name}")
     candidates = [c for c in range(n_classes) if c != y_true]
     return rng.choice(candidates)
 
