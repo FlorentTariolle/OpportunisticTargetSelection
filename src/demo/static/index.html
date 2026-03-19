@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Adversarial Attack Demonstrator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+    --bg: #050505;
+    --bg-alt: #0a0a0a;
+    --text: #fafafa;
+    --text-muted: rgba(255,255,255,0.45);
+    --accent: #ffffff;
+    --accent-muted: rgba(255,255,255,0.6);
+    --glass: rgba(255,255,255,0.025);
+    --glass-border: rgba(255,255,255,0.08);
+}
+[data-theme="light"] {
+    --bg: #FAFAFA;
+    --bg-alt: #F0F0F0;
+    --text: #0a0a0a;
+    --text-muted: rgba(0,0,0,0.4);
+    --accent: #0a0a0a;
+    --accent-muted: rgba(0,0,0,0.6);
+    --glass: rgba(255,255,255,0.65);
+    --glass-border: rgba(0,0,0,0.07);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease; }
+
+body {
+    height: 100vh;
+    overflow: hidden;
+    font-family: 'Outfit', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.app {
+    display: grid;
+    grid-template-rows: 42px 1fr;
+    height: 100vh;
+}
+
+/* Header */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 20px;
+    background: var(--glass);
+    border-bottom: 1px solid var(--glass-border);
+    backdrop-filter: blur(24px);
+}
+.header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: 0.04em; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.gpu-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.9rem;
+    border-radius: 9999px;
+    background: var(--glass);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    font-weight: 500;
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: 0.02em;
+    border: 1px solid var(--glass-border);
+}
+.gpu-badge.active { color: #4ade80; }
+
+/* Theme toggle */
+.theme-toggle {
+    position: relative;
+    background: none;
+    border: 1px solid var(--glass-border);
+    border-radius: 0.5rem;
+    padding: 0.4rem;
+    cursor: pointer;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px; height: 30px;
+    overflow: hidden;
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+.theme-toggle:hover { color: var(--text); border-color: var(--accent-muted); }
+.theme-toggle .icon-sun, .theme-toggle .icon-moon {
+    position: absolute;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.theme-toggle .icon-sun { transform: scale(0.5) translateY(20px); opacity: 0; }
+.theme-toggle .icon-moon { transform: scale(1) translateY(0); opacity: 1; }
+[data-theme="dark"] .theme-toggle .icon-sun { transform: scale(1) translateY(0); opacity: 1; }
+[data-theme="dark"] .theme-toggle .icon-moon { transform: scale(0.5) translateY(20px); opacity: 0; }
+
+/* Main grid */
+.main {
+    display: grid;
+    grid-template-columns: 280px 1fr 1.65fr;
+    gap: 6px;
+    padding: 6px;
+    min-height: 0;
+}
+
+/* Panels */
+.panel {
+    background: var(--bg-alt);
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    overflow: hidden;
+}
+
+/* Config panel */
+.config {
+    padding: 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+}
+
+/* Form elements */
+label {
+    font-size: 0.8rem;
+    font-weight: 400;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+select, input[type="number"] {
+    width: 100%;
+    background: var(--glass);
+    color: var(--text);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-family: 'Outfit', sans-serif;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+}
+select:focus, input:focus { outline: none; border-color: var(--accent-muted); }
+
+/* Custom dropdown (Copia-style) */
+.custom-select { position: relative; }
+.custom-select-btn {
+    width: 100%;
+    background: var(--glass);
+    color: var(--text);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    font-family: 'Outfit', sans-serif;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: border-color 0.3s ease;
+}
+.custom-select-btn:hover { border-color: var(--accent-muted); }
+.custom-select-btn.open { border-color: var(--accent-muted); }
+.custom-select-btn svg { width: 14px; height: 14px; color: var(--text-muted); transition: transform 0.2s ease; }
+.custom-select-btn.open svg { transform: rotate(180deg); }
+.custom-select-panel {
+    position: absolute;
+    top: calc(100% + 0.35rem);
+    left: 0; right: 0;
+    background: var(--bg);
+    border: 1px solid var(--glass-border);
+    border-radius: 0.5rem;
+    padding: 0.25rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+    z-index: 50;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.custom-select-panel.open { opacity: 1; pointer-events: auto; }
+.custom-select-item {
+    display: block;
+    width: 100%;
+    padding: 0.45rem 0.65rem;
+    border: none;
+    border-radius: 0.35rem;
+    background: none;
+    color: var(--text-muted);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.custom-select-item:hover { background: var(--glass); color: var(--text); }
+.custom-select-item.active { color: var(--text); font-weight: 500; }
+
+.radio-group { display: flex; gap: 4px; }
+.radio-group label {
+    flex: 1;
+    text-align: center;
+    padding: 7px 10px;
+    border-radius: 9999px;
+    background: var(--glass);
+    cursor: pointer;
+    font-size: 0.8rem;
+    text-transform: none;
+    font-weight: 400;
+    color: var(--text-muted);
+    border: 1px solid var(--glass-border);
+    transition: all 0.2s ease;
+    letter-spacing: 0.02em;
+}
+.radio-group input { display: none; }
+.radio-group input:checked + label {
+    background: var(--text);
+    color: var(--bg);
+    border-color: var(--text);
+    font-weight: 500;
+}
+
+.slider-row { display: flex; flex-direction: column; gap: 2px; }
+.slider-header { display: flex; justify-content: space-between; align-items: center; }
+.slider-val {
+    font-size: 0.8rem;
+    color: var(--text);
+    font-weight: 500;
+    font-family: 'JetBrains Mono', monospace;
+}
+input[type="range"] {
+    width: 100%;
+    height: 3px;
+    -webkit-appearance: none;
+    background: var(--glass-border);
+    border-radius: 2px;
+    outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    transition: transform 0.15s;
+}
+input[type="range"]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+.checkbox-row { display: flex; align-items: center; gap: 6px; }
+.checkbox-row input[type="checkbox"] { accent-color: var(--text); width: 15px; height: 15px; }
+.checkbox-row span { font-size: 0.85rem; font-weight: 400; }
+
+/* OT toggle (Copia game-toggle style) */
+.ot-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1.25rem;
+    border-radius: 9999px;
+    border: 1px solid var(--glass-border);
+    background: var(--glass);
+    color: var(--text-muted);
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    width: 100%;
+    justify-content: center;
+}
+.ot-toggle.active {
+    color: var(--text);
+    background: var(--glass-border);
+}
+.ot-toggle:disabled { opacity: 0.3; cursor: not-allowed; }
+.ot-toggle svg { width: 14px; height: 14px; }
+
+/* Sliding tab toggle (Copia pricing-tab style) */
+.tab-toggle {
+    position: relative;
+    display: flex;
+    background: var(--glass);
+    border: 1px solid var(--glass-border);
+    border-radius: 9999px;
+    padding: 3px;
+    width: 100%;
+}
+.tab-toggle-btn {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    padding: 6px 10px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    text-align: center;
+}
+.tab-toggle-btn.active { color: var(--text); }
+.tab-indicator {
+    position: absolute;
+    top: 3px;
+    height: calc(100% - 6px);
+    background: var(--glass-border);
+    border-radius: 9999px;
+    transition: left 0.35s cubic-bezier(0.22, 1.2, 0.36, 1), width 0.35s cubic-bezier(0.22, 1.2, 0.36, 1);
+}
+
+.divider { border-top: 1px solid var(--glass-border); margin: 4px 0; }
+
+/* Run button — Copia hero CTA style */
+#run-btn {
+    position: relative;
+    width: 100%;
+    padding: 0.65rem 2rem;
+    border: 1px solid var(--accent-muted);
+    border-radius: 9999px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.95rem;
+    font-weight: 600;
+    font-family: 'Outfit', sans-serif;
+    letter-spacing: 0;
+    cursor: pointer;
+    overflow: hidden;
+    margin-top: auto;
+}
+#run-btn .btn-text {
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+#run-btn:hover .btn-text { transform: translateX(40px); opacity: 0; }
+#run-btn .btn-hover {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    transform: translateX(40px);
+    opacity: 0;
+    transition: all 0.3s ease;
+    color: var(--bg);
+    z-index: 1;
+}
+#run-btn:hover .btn-hover { transform: translateX(0); opacity: 1; }
+#run-btn .btn-bg {
+    position: absolute;
+    left: 14%; top: 40%;
+    width: 8px; height: 8px;
+    border-radius: 9999px;
+    background: var(--text);
+    transition: all 0.3s ease;
+}
+#run-btn:hover .btn-bg { left: 0; top: 0; width: 100%; height: 100%; transform: scale(1.8); }
+#run-btn:disabled { opacity: 0.3; cursor: not-allowed; pointer-events: none; }
+
+/* Input panel */
+.input-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+}
+
+.drop-zone {
+    flex: 1;
+    border: 1.5px dashed var(--glass-border);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+}
+.drop-zone:hover, .drop-zone.dragover { border-color: var(--accent-muted); }
+.drop-zone img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    border-radius: 6px;
+}
+.drop-zone .placeholder { color: var(--text-muted); font-size: 12px; text-align: center; opacity: 0.6; }
+.drop-zone .placeholder svg { width: 28px; height: 28px; margin-bottom: 6px; opacity: 0.4; }
+
+.prediction {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 2px 0;
+    min-height: 18px;
+}
+.prediction strong { color: var(--text); }
+
+.examples-row {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.examples-row img {
+    width: 96px; height: 96px;
+    object-fit: cover;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.2s, opacity 0.2s;
+    opacity: 0.6;
+}
+.examples-row img:hover { border-color: var(--accent-muted); opacity: 1; }
+.examples-row img.active { border-color: var(--text); opacity: 1; }
+
+/* Output panel (2x2 grid) */
+.output-panel {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 6px;
+}
+
+.output-cell {
+    background: var(--bg-alt);
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+.output-cell .cell-label {
+    font-size: 0.7em;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+}
+.output-cell img {
+    flex: 1;
+    min-height: 0;
+    object-fit: contain;
+    border-radius: 6px;
+    max-width: 224px;
+    max-height: 224px;
+    align-self: center;
+}
+.output-cell .empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    opacity: 0.4;
+}
+
+/* Results text */
+.results-text {
+    flex: 1;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 1.7;
+    min-height: 0;
+    color: var(--text-muted);
+}
+.results-text strong { color: var(--text); }
+
+/* Spinner overlay */
+.spinner-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, var(--bg) 90%, transparent);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    border-radius: 10px;
+    z-index: 10;
+    backdrop-filter: blur(8px);
+}
+.spinner-overlay.active { display: flex; }
+.spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--glass-border);
+    border-top-color: var(--text);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner-text { color: var(--text-muted); font-size: 12px; letter-spacing: 0.04em; }
+
+/* Glitch text effect */
+.glitch-wrap {
+    position: relative;
+    display: inline-block;
+}
+.glitch-wrap span {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+.glitch-wrap .glitch-base { color: var(--text); }
+.glitch-wrap .glitch-r,
+.glitch-wrap .glitch-g,
+.glitch-wrap .glitch-b {
+    position: absolute;
+    top: 0; left: 0;
+    mix-blend-mode: screen;
+}
+[data-theme="light"] .glitch-wrap .glitch-r,
+[data-theme="light"] .glitch-wrap .glitch-g,
+[data-theme="light"] .glitch-wrap .glitch-b { mix-blend-mode: multiply; }
+.glitch-wrap .glitch-r {
+    color: #ff0000;
+    animation: glitch-r 0.15s infinite alternate ease-in-out;
+}
+.glitch-wrap .glitch-g {
+    color: #00ff00;
+    animation: glitch-g 0.13s infinite alternate ease-in-out;
+}
+.glitch-wrap .glitch-b {
+    color: #0000ff;
+    animation: glitch-b 0.11s infinite alternate ease-in-out;
+}
+@keyframes glitch-r {
+    0%   { transform: translate(-2px, 0)  skewX(0deg);  opacity: 1; }
+    50%  { transform: translate(2px, -1px) skewX(-2deg); opacity: 0.8; }
+    100% { transform: translate(-2px, 1px) skewX(2deg);  opacity: 0.9; }
+}
+@keyframes glitch-g {
+    0%   { transform: translate(2px, 1px)  skewX(-2deg); opacity: 0.9; }
+    50%  { transform: translate(-2px, -1px) skewX(2deg); opacity: 1; }
+    100% { transform: translate(2px, 0)    skewX(0deg);  opacity: 0.8; }
+}
+/* Glitch effect on input image during attack */
+.drop-zone.glitching img {
+    animation: img-glitch 0.18s infinite alternate ease-in-out;
+}
+@keyframes img-glitch {
+    0%   { transform: translate(0, 0)      skewX(0deg);  filter: hue-rotate(0deg)   saturate(2) brightness(1.0); }
+    20%  { transform: translate(-3px, 1px)  skewX(-1deg); filter: hue-rotate(50deg)  saturate(2.5) brightness(1.1); }
+    40%  { transform: translate(2px, -1px)  skewX(1deg);  filter: hue-rotate(-60deg) saturate(2) brightness(0.95); }
+    60%  { transform: translate(-1px, -2px) skewX(-1deg); filter: hue-rotate(80deg)  saturate(2.5) brightness(1.15); }
+    80%  { transform: translate(2px, 1px)   skewX(1deg);  filter: hue-rotate(-40deg) saturate(2) brightness(1.0); }
+    100% { transform: translate(0, 0)       skewX(0deg);  filter: hue-rotate(0deg)   saturate(2) brightness(1.0); }
+}
+
+@keyframes glitch-b {
+    0%   { transform: translate(-1px, -1px) skewX(2deg);  opacity: 0.8; }
+    50%  { transform: translate(1px, 1px)   skewX(-2deg); opacity: 0.9; }
+    100% { transform: translate(-1px, 0)    skewX(0deg);  opacity: 1; }
+}
+
+/* Hidden elements */
+.hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="app">
+    <!-- Header -->
+    <div class="header">
+        <h1>Adversarial Attack Demonstrator</h1>
+        <div class="header-right">
+            <span class="gpu-badge" id="gpu-badge">Detecting GPU...</span>
+            <button class="theme-toggle" id="themeToggle" aria-label="Toggle theme">
+                <svg class="icon-sun" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main -->
+    <div class="main">
+        <!-- Config panel -->
+        <div class="panel config">
+            <div>
+                <label>Source</label>
+                <div class="tab-toggle" id="source-toggle">
+                    <button class="tab-toggle-btn active" data-value="standard">Standard</button>
+                    <button class="tab-toggle-btn" data-value="robust">Robust</button>
+                    <div class="tab-indicator"></div>
+                </div>
+            </div>
+
+            <div>
+                <label>Model</label>
+                <div class="custom-select" id="model-dropdown">
+                    <div class="custom-select-btn" id="model-btn">
+                        <span>resnet50</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="custom-select-panel" id="model-panel"></div>
+                </div>
+            </div>
+
+            <div>
+                <label>Attack</label>
+                <div class="custom-select" id="method-dropdown">
+                    <div class="custom-select-btn" id="method-btn">
+                        <span>SimBA</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    <div class="custom-select-panel" id="method-panel">
+                        <button class="custom-select-item active" data-value="SimBA">SimBA</button>
+                        <button class="custom-select-item" data-value="Square Attack">Square Attack</button>
+                        <button class="custom-select-item" data-value="Bandits">Bandits</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="loss-group" class="hidden">
+                <label>Loss</label>
+                <div class="tab-toggle" id="loss-toggle">
+                    <button class="tab-toggle-btn active" data-value="ce">Cross-Entropy</button>
+                    <button class="tab-toggle-btn" data-value="margin">Margin</button>
+                    <div class="tab-indicator"></div>
+                </div>
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header">
+                    <label>&epsilon; (n/255)</label>
+                    <span class="slider-val" id="eps-val">8</span>
+                </div>
+                <input type="range" id="eps-slider" min="2" max="64" value="8" step="1">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header">
+                    <label>Iterations</label>
+                    <span class="slider-val" id="iter-val">10000</span>
+                </div>
+                <input type="range" id="iter-slider" min="500" max="20000" value="10000" step="500">
+            </div>
+
+            <div class="slider-row">
+                <div class="slider-header">
+                    <label>Seed</label>
+                    <span class="slider-val" id="seed-val">42</span>
+                </div>
+                <input type="range" id="seed-slider" min="0" max="67" value="42" step="1">
+            </div>
+
+            <div class="divider"></div>
+
+            <div>
+                <label>Mode</label>
+                <div class="tab-toggle" id="mode-toggle">
+                    <button class="tab-toggle-btn active" data-value="untargeted">Untargeted</button>
+                    <button class="tab-toggle-btn" data-value="targeted">Targeted</button>
+                    <div class="tab-indicator"></div>
+                </div>
+            </div>
+
+            <div id="target-group" class="hidden">
+                <label>Target Class (0-999)</label>
+                <input type="number" id="target-class" min="0" max="999" value="0">
+                <div style="font-size:11px; color:#6b7280; margin-top:2px;" id="target-label"></div>
+            </div>
+
+            <div id="ot-group">
+                <button class="ot-toggle active" id="ot-toggle">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    Opportunistic Targeting
+                </button>
+            </div>
+
+            <div id="switch-group" class="slider-row">
+                <div class="slider-header">
+                    <label>Switch Iteration (T)</label>
+                    <span class="slider-val" id="switch-val">10</span>
+                </div>
+                <input type="range" id="switch-slider" min="1" max="500" value="10" step="1">
+            </div>
+
+            <button id="run-btn">
+                <span class="btn-text">Run Attack</span>
+                <div class="btn-hover">
+                    <span>Run Attack</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </div>
+                <div class="btn-bg"></div>
+            </button>
+        </div>
+
+        <!-- Input panel -->
+        <div class="panel input-panel">
+            <div class="drop-zone" id="drop-zone">
+                <div class="placeholder" id="upload-placeholder">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                    <div>Drop image here or click to upload</div>
+                </div>
+                <img id="input-preview" class="hidden" alt="Input">
+            </div>
+            <div class="prediction" id="prediction-text"></div>
+            <div class="examples-row" id="examples-row"></div>
+        </div>
+
+        <!-- Output panel (2x2) -->
+        <div class="output-panel" style="position:relative;">
+            <div class="output-cell">
+                <div class="cell-label">Adversarial</div>
+                <img id="adv-img" class="hidden" alt="Adversarial">
+                <div class="empty" id="adv-empty">Run an attack</div>
+            </div>
+            <div class="output-cell">
+                <div class="cell-label">Perturbation</div>
+                <img id="pert-img" class="hidden" alt="Perturbation">
+                <div class="empty" id="pert-empty">Run an attack</div>
+            </div>
+            <div class="output-cell">
+                <div class="cell-label">Confidence Evolution</div>
+                <img id="conf-graph" class="hidden" alt="Confidence">
+                <div class="empty" id="conf-empty">Run an attack</div>
+            </div>
+            <div class="output-cell">
+                <div class="cell-label">Results</div>
+                <div class="results-text" id="result-text"></div>
+            </div>
+
+            <div class="spinner-overlay" id="spinner">
+                <div class="spinner"></div>
+                <div class="glitch-wrap">
+                    <span class="glitch-base">Running Attack...</span>
+                    <span class="glitch-r">Running Attack...</span>
+                    <span class="glitch-g">Running Attack...</span>
+                    <span class="glitch-b">Running Attack...</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// State
+let currentImage = null; // File object
+let imagenetLabels = {};
+let selectedModel = 'resnet50';
+let selectedMethod = 'SimBA';
+let selectedSource = 'standard';
+let selectedMode = 'untargeted';
+let selectedLoss = 'ce';
+
+// Init
+async function init() {
+    // Load ImageNet labels
+    try {
+        const resp = await fetch('/data/imagenet_class_index.json');
+        const data = await resp.json();
+        for (const [k, v] of Object.entries(data)) {
+            imagenetLabels[parseInt(k)] = v[1];
+        }
+    } catch(e) { console.warn('Could not load ImageNet labels:', e); }
+
+    await updateModelList();
+    await loadExamples();
+    setupDropZone();
+    setupListeners();
+    await detectGPU();
+    initTheme();
+}
+
+async function detectGPU() {
+    try {
+        const resp = await fetch('/api/gpu');
+        const data = await resp.json();
+        const badge = document.getElementById('gpu-badge');
+        if (data.available) {
+            badge.textContent = '\u2022 ' + data.name;
+            badge.classList.add('active');
+        } else {
+            badge.textContent = '\u25CB CPU only';
+        }
+    } catch(e) {
+        document.getElementById('gpu-badge').textContent = 'GPU: unknown';
+    }
+}
+
+// Sliding tab toggle (Copia-style)
+function setupTabToggle(containerId, onChange) {
+    const container = document.getElementById(containerId);
+    const btns = container.querySelectorAll('.tab-toggle-btn');
+    const indicator = container.querySelector('.tab-indicator');
+
+    function moveIndicator(btn) {
+        indicator.style.left = btn.offsetLeft + 'px';
+        indicator.style.width = btn.offsetWidth + 'px';
+    }
+
+    // Init position without transition
+    const initial = container.querySelector('.tab-toggle-btn.active');
+    indicator.style.transition = 'none';
+    moveIndicator(initial);
+    indicator.offsetHeight; // force reflow
+    indicator.style.transition = '';
+
+    // Recalculate after fonts load
+    document.fonts.ready.then(() => {
+        indicator.style.transition = 'none';
+        moveIndicator(container.querySelector('.tab-toggle-btn.active'));
+        indicator.offsetHeight;
+        indicator.style.transition = '';
+    });
+
+    btns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            btns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            moveIndicator(btn);
+            if (onChange) onChange(btn.dataset.value);
+        });
+    });
+
+    return () => container.querySelector('.tab-toggle-btn.active')?.dataset.value;
+}
+
+// Custom dropdown logic
+function setupCustomSelect(btnId, panelId, onSelect) {
+    const btn = document.getElementById(btnId);
+    const panel = document.getElementById(panelId);
+    btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Close all other panels
+        document.querySelectorAll('.custom-select-panel.open').forEach(p => { if (p !== panel) p.classList.remove('open'); });
+        document.querySelectorAll('.custom-select-btn.open').forEach(b => { if (b !== btn) b.classList.remove('open'); });
+        btn.classList.toggle('open');
+        panel.classList.toggle('open');
+    });
+    panel.addEventListener('click', (e) => {
+        const item = e.target.closest('.custom-select-item');
+        if (!item) return;
+        const value = item.dataset.value;
+        btn.querySelector('span').textContent = item.textContent;
+        panel.querySelectorAll('.custom-select-item').forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        btn.classList.remove('open');
+        panel.classList.remove('open');
+        if (onSelect) onSelect(value);
+    });
+}
+
+// Close dropdowns on outside click
+document.addEventListener('click', () => {
+    document.querySelectorAll('.custom-select-panel.open').forEach(p => p.classList.remove('open'));
+    document.querySelectorAll('.custom-select-btn.open').forEach(b => b.classList.remove('open'));
+});
+
+// Model display names
+var modelDisplayNames = {
+    'resnet18': 'ResNet-18',
+    'resnet50': 'ResNet-50',
+    'vgg16': 'VGG-16',
+    'alexnet': 'AlexNet',
+    'vit_b_16': 'ViT-B/16',
+    'Salman2020Do_R18': 'Salman R18',
+    'Salman2020Do_R50': 'Salman R50',
+};
+function displayName(key) { return modelDisplayNames[key] || key; }
+
+// Models
+async function updateModelList() {
+    const source = selectedSource;
+    const resp = await fetch(`/api/models/${source}`);
+    const data = await resp.json();
+    const panel = document.getElementById('model-panel');
+    panel.innerHTML = '';
+    for (const m of data.models) {
+        const item = document.createElement('button');
+        item.className = 'custom-select-item';
+        item.dataset.value = m;
+        item.textContent = displayName(m);
+        panel.appendChild(item);
+    }
+    // Default to resnet50 if available
+    selectedModel = data.models.includes('resnet50') ? 'resnet50' : data.models[0];
+    document.getElementById('model-btn').querySelector('span').textContent = displayName(selectedModel);
+    panel.querySelector(`[data-value="${selectedModel}"]`)?.classList.add('active');
+}
+
+// Examples
+async function loadExamples() {
+    const resp = await fetch('/api/examples');
+    const data = await resp.json();
+    const row = document.getElementById('examples-row');
+    row.innerHTML = '';
+    for (const ex of data.examples) {
+        const img = document.createElement('img');
+        img.src = ex.url;
+        img.alt = ex.name;
+        img.title = ex.name;
+        img.addEventListener('click', () => loadExample(ex.url, img));
+        row.appendChild(img);
+    }
+}
+
+async function loadExample(url, thumbEl) {
+    const resp = await fetch(url);
+    const blob = await resp.blob();
+    currentImage = new File([blob], url.split('/').pop(), { type: blob.type });
+    // Show preview
+    const preview = document.getElementById('input-preview');
+    preview.src = URL.createObjectURL(blob);
+    preview.classList.remove('hidden');
+    document.getElementById('upload-placeholder').classList.add('hidden');
+    // Highlight active example
+    document.querySelectorAll('.examples-row img').forEach(i => i.classList.remove('active'));
+    if (thumbEl) thumbEl.classList.add('active');
+    await predictCurrent();
+}
+
+// Drop zone
+function setupDropZone() {
+    const zone = document.getElementById('drop-zone');
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+    });
+    zone.addEventListener('click', () => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.onchange = () => { if (input.files.length) handleFile(input.files[0]); };
+        input.click();
+    });
+}
+
+function handleFile(file) {
+    currentImage = file;
+    const preview = document.getElementById('input-preview');
+    preview.src = URL.createObjectURL(file);
+    preview.classList.remove('hidden');
+    document.getElementById('upload-placeholder').classList.add('hidden');
+    document.querySelectorAll('.examples-row img').forEach(i => i.classList.remove('active'));
+    predictCurrent();
+}
+
+// Predict
+async function predictCurrent() {
+    if (!currentImage) return;
+    const fd = new FormData();
+    fd.append('image', currentImage);
+    fd.append('model_name', selectedModel);
+    fd.append('source', selectedSource);
+    try {
+        const resp = await fetch('/api/predict', { method: 'POST', body: fd });
+        const data = await resp.json();
+        document.getElementById('prediction-text').innerHTML =
+            `<strong>${data.label}</strong> (${(data.confidence * 100).toFixed(1)}%)`;
+    } catch(e) {
+        document.getElementById('prediction-text').textContent = 'Prediction failed';
+    }
+}
+
+// Attack
+async function runAttack() {
+    if (!currentImage) { alert('Please upload an image first.'); return; }
+
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.querySelector('.btn-text').textContent = 'Running...';
+    document.getElementById('spinner').classList.add('active');
+    document.getElementById('drop-zone').classList.add('glitching');
+
+    const fd = new FormData();
+    fd.append('image', currentImage);
+    fd.append('method', selectedMethod);
+    fd.append('epsilon_n', document.getElementById('eps-slider').value);
+    fd.append('max_iterations', document.getElementById('iter-slider').value);
+    fd.append('model_name', selectedModel);
+    fd.append('source', selectedSource);
+    fd.append('mode', selectedMode);
+    fd.append('target_class', document.getElementById('target-class').value);
+    fd.append('opportunistic', document.getElementById('ot-toggle').classList.contains('active') ? 'true' : 'false');
+    fd.append('switch_iteration', document.getElementById('switch-slider').value);
+    fd.append('loss', selectedLoss);
+    fd.append('seed', document.getElementById('seed-slider').value);
+
+    try {
+        const resp = await fetch('/api/attack', { method: 'POST', body: fd });
+        const data = await resp.json();
+
+        setOutputImage('adv-img', 'adv-empty', data.adversarial_image);
+        setOutputImage('pert-img', 'pert-empty', data.perturbation_image);
+        setOutputImage('conf-graph', 'conf-empty', data.confidence_graph);
+        document.getElementById('result-text').innerHTML = renderResult(data.result_text);
+    } catch(e) {
+        document.getElementById('result-text').textContent = 'Error: ' + e.message;
+    } finally {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').textContent = 'Run Attack';
+        document.getElementById('spinner').classList.remove('active');
+        document.getElementById('drop-zone').classList.remove('glitching');
+    }
+}
+
+function setOutputImage(imgId, emptyId, base64) {
+    const img = document.getElementById(imgId);
+    const empty = document.getElementById(emptyId);
+    if (base64) {
+        img.src = 'data:image/png;base64,' + base64;
+        img.classList.remove('hidden');
+        if (empty) empty.classList.add('hidden');
+    }
+}
+
+function renderResult(text) {
+    if (!text) return '';
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '<br>')
+        .replace(/\n/g, '<br>');
+}
+
+// Listeners
+function setupListeners() {
+    // Source tab toggle
+    setupTabToggle('source-toggle', async (val) => {
+        selectedSource = val;
+        await updateModelList();
+        if (currentImage) predictCurrent();
+    });
+
+    // Mode tab toggle
+    setupTabToggle('mode-toggle', (val) => {
+        selectedMode = val;
+        const targeted = val === 'targeted';
+        document.getElementById('target-group').classList.toggle('hidden', !targeted);
+        document.getElementById('ot-group').classList.toggle('hidden', targeted);
+        document.getElementById('switch-group').classList.toggle('hidden',
+            targeted || !document.getElementById('ot-toggle').classList.contains('active'));
+    });
+
+    // Custom dropdowns
+    setupCustomSelect('model-btn', 'model-panel', (val) => {
+        selectedModel = val;
+        if (currentImage) predictCurrent();
+    });
+    setupCustomSelect('method-btn', 'method-panel', (val) => {
+        selectedMethod = val;
+        document.getElementById('loss-group').classList.toggle('hidden', val !== 'Square Attack');
+        updateOTState();
+    });
+
+    // OT toggle → swap icon and show/hide switch slider
+    var otCheckSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    var otPlusSvg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+    document.getElementById('ot-toggle').addEventListener('click', () => {
+        const btn = document.getElementById('ot-toggle');
+        if (btn.disabled) return;
+        const wasActive = btn.classList.contains('active');
+        btn.classList.toggle('active');
+        var tmp = document.createElement('div');
+        tmp.innerHTML = wasActive ? otPlusSvg : otCheckSvg;
+        btn.querySelector('svg').replaceWith(tmp.firstChild);
+        document.getElementById('switch-group').classList.toggle('hidden', wasActive);
+    });
+
+    // Loss tab toggle
+    setupTabToggle('loss-toggle', (val) => {
+        selectedLoss = val;
+        updateOTState();
+    });
+
+    // Target class label
+    document.getElementById('target-class').addEventListener('input', () => {
+        const idx = parseInt(document.getElementById('target-class').value) || 0;
+        document.getElementById('target-label').textContent = imagenetLabels[idx] || '';
+    });
+
+    // Slider value displays
+    const sliders = [
+        ['eps-slider', 'eps-val'],
+        ['iter-slider', 'iter-val'],
+        ['seed-slider', 'seed-val'],
+        ['switch-slider', 'switch-val'],
+    ];
+    for (const [sid, vid] of sliders) {
+        document.getElementById(sid).addEventListener('input', () => {
+            document.getElementById(vid).textContent = document.getElementById(sid).value;
+        });
+    }
+
+    // Run button
+    document.getElementById('run-btn').addEventListener('click', runAttack);
+}
+
+function updateOTState() {
+    const method = selectedMethod;
+    const loss = selectedLoss;
+    const btn = document.getElementById('ot-toggle');
+    if (method === 'Square Attack' && loss === 'margin') {
+        btn.classList.remove('active');
+        btn.disabled = true;
+        var tmp = document.createElement('div');
+        tmp.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+        btn.querySelector('svg').replaceWith(tmp.firstChild);
+        document.getElementById('switch-group').classList.add('hidden');
+    } else {
+        btn.disabled = false;
+    }
+}
+
+// Theme toggle
+function initTheme() {
+    var currentTheme = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    document.getElementById('themeToggle').addEventListener('click', function() {
+        currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', currentTheme);
+        localStorage.setItem('theme', currentTheme);
+    });
+}
+
+// Start
+init();
+</script>
+</body>
+</html>

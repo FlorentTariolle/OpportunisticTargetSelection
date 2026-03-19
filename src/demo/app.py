@@ -153,10 +153,10 @@ def create_confidence_graph(
     original_conf = confidence_history['original_class']
     max_other_conf = confidence_history['max_other_class']
 
-    # Create figure
-    fig, ax = plt.subplots(figsize=(8, 5))
-    ax.plot(iterations, original_conf, 'b-', label='Original Class Confidence', linewidth=2)
-    ax.plot(iterations, max_other_conf, 'r--', label='Max Other Class Confidence', linewidth=2)
+    # Create figure (compact for bento layout)
+    fig, ax = plt.subplots(figsize=(5, 3))
+    ax.plot(iterations, original_conf, 'b-', label='True class', linewidth=1.5)
+    ax.plot(iterations, max_other_conf, 'r--', label='Max other', linewidth=1.5)
 
     # Add target/locked class line if available
     if opportunistic:
@@ -187,29 +187,23 @@ def create_confidence_graph(
 
             if valid_conf and valid_iters:
                 ax.plot(valid_iters[:len(valid_conf)], valid_conf[:len(valid_iters)],
-                       'g-', label='Locked Class Confidence', linewidth=2)
+                       'g-', label='Locked class', linewidth=1.5)
 
             # Vertical line at lock iteration
             switch_iter = confidence_history.get('switch_iteration')
             if switch_iter is not None:
-                ax.axvline(x=switch_iter, color='purple', linestyle=':', linewidth=1.5,
-                           label=f'Lock iteration (class {locked_class})')
+                ax.axvline(x=switch_iter, color='purple', linestyle=':', linewidth=1,
+                           label=f'Lock (T={switch_iter})')
     elif targeted and 'target_class' in confidence_history and len(confidence_history['target_class']) > 0:
         target_conf = confidence_history['target_class']
         # For targeted mode from the start, align with first N iterations
         target_iterations = iterations[:len(target_conf)]
-        ax.plot(target_iterations, target_conf, 'g-', label='Target Class Confidence', linewidth=2)
+        ax.plot(target_iterations, target_conf, 'g-', label='Target class', linewidth=1.5)
 
-    ax.set_xlabel('Iteration', fontsize=12)
-    ax.set_ylabel('Confidence', fontsize=12)
-    if opportunistic:
-        title = 'Confidence Evolution During Opportunistic Attack'
-    elif targeted:
-        title = 'Confidence Evolution During Targeted Attack'
-    else:
-        title = 'Confidence Evolution During Untargeted Attack'
-    ax.set_title(title, fontsize=14, fontweight='bold')
-    ax.legend(loc='best', fontsize=10)
+    ax.set_xlabel('Iteration', fontsize=9)
+    ax.set_ylabel('Confidence', fontsize=9)
+    ax.tick_params(labelsize=8)
+    ax.legend(loc='best', fontsize=7)
     ax.grid(True, alpha=0.3)
     ax.set_ylim([0, 1])
 
@@ -264,7 +258,7 @@ def run_attack(
     targeted: bool = False,
     target_class: Optional[int] = None,
     opportunistic: bool = False,
-    stability_threshold: int = 30,
+    switch_iteration: int = 5,
     loss: str = 'margin',
     source: str = 'standard',
     seed: int = 42,
@@ -279,8 +273,8 @@ def run_attack(
         model_name: Name of the target model to attack.
         targeted: If True, perform targeted attack.
         target_class: Target class index for targeted attack.
-        opportunistic: If True, start untargeted and switch to targeted when max class stabilizes.
-        stability_threshold: Number of consecutive accepted perturbations before switching.
+        opportunistic: If True, start untargeted and switch to targeted at iteration T.
+        switch_iteration: Iteration at which to lock onto the leading non-true class.
         loss: Loss function for Square Attack ('margin' or 'ce').
         source: 'standard' or 'robust'.
 
@@ -362,7 +356,7 @@ def run_attack(
                 image_tensor, y_true,
                 track_confidence=True,
                 opportunistic=opportunistic,
-                stability_threshold=stability_threshold
+                naive_switch_iteration=switch_iteration
             )
         
         # Get adversarial prediction
@@ -381,13 +375,8 @@ def run_attack(
         adv_label = get_imagenet_label(adv_class)
         final_max_other_label = get_imagenet_label(final_max_other_class)
 
-        # Confidence & confusion metrics
+        # Confidence metrics
         loss_of_confidence = original_confidence - final_true_confidence
-        # Confusion: 1 when true_conf <= max_other (model is wrong or tied),
-        # decreases as true class pulls ahead.  Capped at 1.0.
-        initial_confusion = 1.0 - max(original_confidence - initial_max_other_confidence, 0.0)
-        final_confusion = 1.0 - max(final_true_confidence - final_max_other_confidence, 0.0)
-        gain_of_confusion = final_confusion - initial_confusion
 
         # Check if attack was successful
         if targeted and target_class is not None:
@@ -427,87 +416,26 @@ def run_attack(
         l2 = total_perturbation.norm(2).item()
         mean_l1 = total_perturbation.abs().mean().item()
 
-        # Create result message sections
-        perturbation_section = f"""**Perturbation Metrics:**
-- L∞: {linf:.4f}
-- L2: {l2:.4f}
-- Mean L1: {mean_l1:.6f}"""
+        # Build compact result text
+        status_icon = '✓' if is_successful else '✗'
 
-        confidence_section = f"""**Confidence Metrics:**
-- True class: {original_confidence:.2%} → {final_true_confidence:.2%}
-- Loss of Confidence: {loss_of_confidence:+.2%}
-- Top adversarial class: {final_max_other_class} ({final_max_other_label}) — {final_max_other_confidence:.2%}
-
-**Confusion Metrics:**
-- Initial Confusion: {initial_confusion:.2%}
-- Final Confusion: {final_confusion:.2%}
-- Gain of Confusion: {gain_of_confusion:+.2%}"""
-
-        if targeted and target_class is not None:
-            result_text = f"""**Attack Mode:** Targeted
-
-**Original Prediction:**
-- Class: {original_class} ({original_label})
-- Confidence: {original_confidence:.2%}
-
-**Target Class:**
-- Class: {target_class} ({target_label})
-
-**Adversarial Prediction:**
-- Class: {adv_class} ({adv_label})
-- Confidence: {adv_confidence:.2%}
-
-**Budget:** {budget_display}
-
-{confidence_section}
-
-{perturbation_section}
-
-**Attack Status:** {'✓ Successful' if is_successful else '✗ Failed'}
-"""
+        if opportunistic and switch_iteration is not None:
+            mode_line = f"**OT** (locked at T={switch_iteration})"
         elif opportunistic:
-            mode_desc = "Opportunistic"
-            if switch_iteration is not None:
-                mode_desc += f" (switched to targeted at iteration {switch_iteration})"
-            else:
-                mode_desc += " (no switch occurred)"
-            result_text = f"""**Attack Mode:** {mode_desc}
-
-**Original Prediction:**
-- Class: {original_class} ({original_label})
-- Confidence: {original_confidence:.2%}
-
-**Adversarial Prediction:**
-- Class: {adv_class} ({adv_label})
-- Confidence: {adv_confidence:.2%}
-
-**Budget:** {budget_display}
-
-{confidence_section}
-
-{perturbation_section}
-
-**Attack Status:** {'✓ Successful' if is_successful else '✗ Failed'}
-"""
+            mode_line = "**OT** (no lock)"
+        elif targeted and target_class is not None:
+            target_label = get_imagenet_label(target_class)
+            mode_line = f"**Targeted** → {target_class} ({target_label})"
         else:
-            result_text = f"""**Attack Mode:** Untargeted
+            mode_line = "**Untargeted**"
 
-**Original Prediction:**
-- Class: {original_class} ({original_label})
-- Confidence: {original_confidence:.2%}
-
-**Adversarial Prediction:**
-- Class: {adv_class} ({adv_label})
-- Confidence: {adv_confidence:.2%}
-
-**Budget:** {budget_display}
-
-{confidence_section}
-
-{perturbation_section}
-
-**Attack Status:** {'✓ Successful' if is_successful else '✗ Failed'}
-"""
+        result_text = (
+            f"{status_icon} {mode_line} | {budget_display}\n\n"
+            f"**Original:** {original_class} ({original_label}) — {original_confidence:.2%}\n\n"
+            f"**Result:** {adv_class} ({adv_label}) — {adv_confidence:.2%}\n\n"
+            f"True: {original_confidence:.2%} → {final_true_confidence:.2%} ({loss_of_confidence:+.2%})\n\n"
+            f"L∞={linf:.4f} | L2={l2:.2f}"
+        )
 
         return adv_image, perturbation_image, confidence_graph, result_text
         
@@ -529,237 +457,215 @@ def create_demo_interface():
     if torch.cuda.is_available():
         gpu_name = torch.cuda.get_device_name(0)
         gpu_status_md = (
-            f"<div style='display:inline-block; padding:4px 12px; "
-            f"border-radius:6px; background:#d4edda; color:#155724; "
+            f"<span class='gpu-badge' style='display:inline-block; padding:4px 12px; "
+            f"border-radius:6px; background:#d4edda !important; "
             f"font-size:0.9em'>"
-            f"&#9679; GPU Active &mdash; <strong>{gpu_name}</strong></div>"
+            f"&#9679; GPU Active &mdash; <strong>{gpu_name}</strong></span>"
         )
     else:
         gpu_status_md = (
-            "<div style='display:inline-block; padding:4px 12px; "
-            "border-radius:6px; background:#e2e3e5; color:#6c757d; "
+            "<span class='gpu-badge' style='display:inline-block; padding:4px 12px; "
+            "border-radius:6px; background:#e2e3e5 !important; "
             "font-size:0.9em'>"
-            "&#9675; GPU Unavailable &mdash; running on CPU</div>"
+            "&#9675; GPU Unavailable &mdash; running on CPU</span>"
         )
 
-    with gr.Blocks(title="Adversarial Attack Demonstrator") as demo:
+    compact_css = """
+    .gradio-container { max-width: 100% !important; padding: 8px !important; }
+    .contain { gap: 6px !important; }
+    .block { padding: 8px !important; }
+    #header { margin: 0 0 4px 0 !important; padding: 0 !important; }
+    #header h1 { font-size: 1.3em !important; margin: 0 !important; }
+    #header p { font-size: 0.85em !important; margin: 2px 0 0 0 !important; }
+    .gap { gap: 4px !important; }
+    .gpu-badge, .gpu-badge * { color: #000000 !important; }
+    """
+
+    with gr.Blocks(title="Adversarial Attack Demonstrator", css=compact_css) as demo:
         gr.Markdown(
-            f"""
-            # Adversarial Black-Box Attack Demonstrator
-
-            Upload an image and configure the attack parameters to generate adversarial examples.
-
-            {gpu_status_md}
-            """
+            f"<div style='display:flex; justify-content:space-between; align-items:center;'>"
+            f"<h1 style='margin:0; font-size:1.3em;'>Opportunistic Targeting &mdash; Attack Demonstrator</h1>"
+            f"{gpu_status_md}</div>",
+            elem_id="header"
         )
-        
-        with gr.Row():
-            with gr.Column(scale=1):
-                gr.Markdown("### Attack Configuration")
-                
-                method_dropdown = gr.Dropdown(
-                    choices=["SimBA", "Square Attack", "Bandits"],
-                    value="Square Attack",
-                    label="Attack Method",
-                    info="Select the adversarial attack method"
-                )
-                
-                epsilon_slider = gr.Slider(
-                    minimum=2,
-                    maximum=64,
-                    value=8,
-                    step=1,
-                    label="Epsilon (ε) — n/255",
-                    info="Maximum perturbation magnitude (L∞ norm): n / 255"
-                )
-                
-                max_iter_slider = gr.Slider(
-                    minimum=500,
-                    maximum=20000,
-                    value=10000,
-                    step=500,
-                    label="Max Iterations",
-                    info="Maximum number of attack iterations (affects Square Attack patch schedule)"
-                )
 
-                seed_slider = gr.Slider(
-                    minimum=0,
-                    maximum=99,
-                    value=42,
-                    step=1,
-                    label="Seed",
-                    info="Random seed for reproducibility"
-                )
-                
+        imagenet_labels = get_imagenet_labels()
+
+        # Hidden component to store the raw uploaded image
+        image_input = gr.Image(type="pil", visible=False)
+
+        # === TOP ROW: Config | Input Image | Output Images ===
+        with gr.Row(equal_height=True):
+            # --- Config column ---
+            with gr.Column(scale=2, min_width=280):
                 model_source_radio = gr.Radio(
                     choices=["Standard", "Robust (RobustBench)"],
-                    value="Standard",
-                    label="Model Source",
-                    info="Standard: torchvision models. Robust: adversarially-trained (RobustBench ImageNet L∞)."
+                    value="Standard", label="Source"
                 )
-
                 model_dropdown = gr.Dropdown(
-                    choices=STANDARD_MODELS,
-                    value="resnet18",
-                    label="Model",
-                    info="Target model to attack"
+                    choices=STANDARD_MODELS, value="resnet50", label="Model"
                 )
-
+                method_dropdown = gr.Dropdown(
+                    choices=["SimBA", "Square Attack", "Bandits"],
+                    value="SimBA", label="Attack"
+                )
                 loss_radio = gr.Radio(
                     choices=["Cross-Entropy", "Margin"],
-                    value="Cross-Entropy",
-                    label="Loss Function",
-                    info="Loss optimized by Square Attack",
-                    visible=True
-                )
-
-                # Show/hide loss selector based on attack method
-                def update_loss_visibility(method, current_loss):
-                    return gr.Radio(
-                        choices=["Cross-Entropy", "Margin"],
-                        value=current_loss,
-                        label="Loss Function",
-                        info="Loss optimized by Square Attack",
-                        visible=(method == "Square Attack"),
-                    )
-
-                method_dropdown.change(
-                    fn=update_loss_visibility,
-                    inputs=[method_dropdown, loss_radio],
-                    outputs=[loss_radio]
-                )
-
-                gr.Markdown("### Attack Mode")
-
-                attack_mode = gr.Radio(
-                    choices=["Untargeted", "Targeted"],
-                    value="Untargeted",
-                    label="Attack Mode",
-                    info="Untargeted: cause any misclassification. Targeted: force specific class."
-                )
-
-                imagenet_labels = get_imagenet_labels()
-
-                target_class_number = gr.Number(
-                    value=0,
-                    label="Target Class Index (0-999)",
-                    info="Enter an ImageNet class index",
-                    precision=0,
+                    value="Cross-Entropy", label="Loss",
                     visible=False
                 )
-
+                epsilon_slider = gr.Slider(
+                    minimum=2, maximum=64, value=8, step=1,
+                    label="ε (n/255)"
+                )
+                max_iter_slider = gr.Slider(
+                    minimum=500, maximum=20000, value=10000, step=500,
+                    label="Iterations"
+                )
+                with gr.Row():
+                    seed_slider = gr.Slider(
+                        minimum=0, maximum=99, value=42, step=1, label="Seed"
+                    )
+                attack_mode = gr.Radio(
+                    choices=["Untargeted", "Targeted"],
+                    value="Untargeted", label="Mode"
+                )
+                target_class_number = gr.Number(
+                    value=0, label="Target Class (0-999)", precision=0, visible=False
+                )
                 target_class_label = gr.Markdown(
                     value=f"**Target:** 0 — {imagenet_labels.get(0, 'unknown')}",
                     visible=False
                 )
-
                 opportunistic_checkbox = gr.Checkbox(
-                    value=False,
-                    label="Opportunistic Targeting",
-                    info="Start untargeted, then switch to targeted when a class stabilizes",
-                    visible=True
+                    value=True, label="Opportunistic Targeting (OT)",
+                    info="Lock onto leading class at iteration T"
                 )
-
-                stability_threshold_slider = gr.Slider(
-                    minimum=1,
-                    maximum=20,
-                    value=5,
-                    step=1,
-                    label="Stability Threshold",
-                    info="Consecutive accepted perturbations before switching to targeted (5 for standard, 10 for robust)",
-                    visible=False
+                switch_iteration_slider = gr.Slider(
+                    minimum=1, maximum=500, value=10, step=1,
+                    label="Switch Iteration (T)", visible=True
                 )
+                attack_button = gr.Button("Run Attack", variant="primary", size="lg")
 
-                # Show/hide controls based on attack mode
-                def update_mode_visibility(mode):
-                    is_targeted = (mode == "Targeted")
-                    return (
-                        gr.update(visible=is_targeted),  # target_class_number
-                        gr.update(visible=is_targeted),  # target_class_label
-                        gr.update(visible=not is_targeted),  # opportunistic_checkbox
-                        gr.update(visible=False)  # stability_threshold_slider (controlled by checkbox)
+            # --- Input image column ---
+            with gr.Column(scale=3, min_width=300):
+                original_output = gr.Image(
+                    label="Input", type="pil", height=200,
+                    sources=["upload", "clipboard"], interactive=True
+                )
+                # Example images
+                example_images = []
+                example_dir = os.path.join(project_root, "data")
+                if os.path.exists(example_dir):
+                    # basketball.jpg first as default example
+                    basketball = os.path.join(example_dir, "basketball.jpg")
+                    if os.path.exists(basketball):
+                        example_images.append(basketball)
+                    for filename in sorted(os.listdir(example_dir)):
+                        filepath = os.path.join(example_dir, filename)
+                        if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')) and filepath not in example_images:
+                            example_images.append(filepath)
+                if example_images:
+                    gr.Examples(
+                        examples=example_images, inputs=image_input,
+                        label="Examples", examples_per_page=8
                     )
 
-                attack_mode.change(
-                    fn=update_mode_visibility,
-                    inputs=[attack_mode],
-                    outputs=[target_class_number, target_class_label,
-                             opportunistic_checkbox, stability_threshold_slider]
-                )
-
-                # Update label preview when class index changes
-                def update_target_label(idx):
-                    idx = int(idx) if idx is not None else 0
-                    idx = max(0, min(999, idx))
-                    name = imagenet_labels.get(idx, 'unknown')
-                    return f"**Target:** {idx} — {name}"
-
-                target_class_number.change(
-                    fn=update_target_label,
-                    inputs=[target_class_number],
-                    outputs=[target_class_label]
-                )
-
-                # Show/hide stability threshold based on opportunistic checkbox
-                def update_stability_visibility(opportunistic):
-                    return gr.update(visible=opportunistic)
-
-                opportunistic_checkbox.change(
-                    fn=update_stability_visibility,
-                    inputs=[opportunistic_checkbox],
-                    outputs=[stability_threshold_slider]
-                )
-
-                attack_button = gr.Button("Run Attack", variant="primary", size="lg")
-            
-            with gr.Column(scale=2):
-                gr.Markdown("### Image")
-
-                # Hidden component to store the raw uploaded image
-                image_input = gr.Image(
-                    type="pil",
-                    visible=False
-                )
-
-                # Preprocessed image shown directly to the user
-                original_output = gr.Image(
-                    label="Preprocessed Image",
-                    type="pil",
-                    height=400,
-                    sources=["upload", "clipboard"],
-                    interactive=True
-                )
-
+            # --- Outputs column ---
+            with gr.Column(scale=4, min_width=400):
                 with gr.Row():
                     adversarial_output = gr.Image(
-                        label="Adversarial Image",
-                        type="pil",
-                        height=300
+                        label="Adversarial", type="pil", height=280
                     )
-
                     perturbation_output = gr.Image(
-                        label="Perturbation (scaled for visibility)",
-                        type="pil",
-                        height=300
+                        label="Perturbation", type="pil", height=280
                     )
+                with gr.Row():
+                    confidence_graph_output = gr.Image(
+                        label="Confidence Evolution", type="pil", height=200
+                    )
+                    result_text = gr.Markdown(label="Results")
 
-            with gr.Column(scale=1):
-                gr.Markdown("### Results")
+        # === EVENT HANDLERS ===
 
-                confidence_graph_output = gr.Image(
-                    label="Confidence Evolution",
-                    type="pil",
-                    height=300
-                )
+        # Show/hide loss selector based on attack method
+        def update_loss_visibility(method, current_loss):
+            return gr.Radio(
+                choices=["Cross-Entropy", "Margin"],
+                value=current_loss, label="Loss",
+                visible=(method == "Square Attack"),
+            )
 
-                result_text = gr.Markdown(label="Attack Results")
+        method_dropdown.change(
+            fn=update_loss_visibility,
+            inputs=[method_dropdown, loss_radio],
+            outputs=[loss_radio]
+        )
+
+        # Show/hide controls based on attack mode
+        def update_mode_visibility(mode):
+            is_targeted = (mode == "Targeted")
+            return (
+                gr.update(visible=is_targeted),
+                gr.update(visible=is_targeted),
+                gr.update(visible=not is_targeted),
+                gr.update(visible=False)
+            )
+
+        attack_mode.change(
+            fn=update_mode_visibility,
+            inputs=[attack_mode],
+            outputs=[target_class_number, target_class_label,
+                     opportunistic_checkbox, switch_iteration_slider]
+        )
+
+        # Update label preview when class index changes
+        def update_target_label(idx):
+            idx = int(idx) if idx is not None else 0
+            idx = max(0, min(999, idx))
+            name = imagenet_labels.get(idx, 'unknown')
+            return f"**Target:** {idx} — {name}"
+
+        target_class_number.change(
+            fn=update_target_label,
+            inputs=[target_class_number],
+            outputs=[target_class_label]
+        )
+
+        # Show/hide switch iteration slider based on opportunistic checkbox
+        def update_switch_visibility(opportunistic):
+            return gr.update(visible=opportunistic)
+
+        opportunistic_checkbox.change(
+            fn=update_switch_visibility,
+            inputs=[opportunistic_checkbox],
+            outputs=[switch_iteration_slider]
+        )
+
+        # Disable OT when margin loss is selected
+        def update_ot_for_loss(method, loss_choice, mode):
+            is_margin = (method == "Square Attack" and loss_choice == "Margin")
+            is_targeted = (mode == "Targeted")
+            if is_margin or is_targeted:
+                return gr.update(value=False, interactive=not is_margin, visible=not is_targeted,
+                                 info="OT is redundant with margin loss" if is_margin else "Lock onto leading class at iteration T")
+            return gr.update(interactive=True, visible=True,
+                             info="Lock onto leading class at iteration T")
+
+        loss_radio.change(
+            fn=update_ot_for_loss,
+            inputs=[method_dropdown, loss_radio, attack_mode],
+            outputs=[opportunistic_checkbox]
+        )
+        method_dropdown.change(
+            fn=update_ot_for_loss,
+            inputs=[method_dropdown, loss_radio, attack_mode],
+            outputs=[opportunistic_checkbox]
+        )
         
         # When user uploads directly to the visible component, store raw in hidden input
-        def store_raw_image(image):
-            return image
-
         original_output.upload(
-            fn=store_raw_image,
+            fn=lambda image: image,
             inputs=[original_output],
             outputs=[image_input]
         )
@@ -803,7 +709,7 @@ def create_demo_interface():
         # Run attack when button is clicked
         # Note: original_output is NOT in outputs - it stays static during attack
         def execute_attack(image, method, epsilon_n, max_iter, model, loss_choice,
-                          mode, target_cls_idx, opportunistic, stability_threshold,
+                          mode, target_cls_idx, opportunistic, switch_iteration,
                           source_choice, seed):
             if image is None:
                 return None, None, None, "Please upload an image first."
@@ -823,7 +729,7 @@ def create_demo_interface():
             adv_image, pert_image, conf_graph, result = run_attack(
                 image, method, epsilon, max_iter, model,
                 targeted=targeted, target_class=target_class,
-                opportunistic=use_opportunistic, stability_threshold=int(stability_threshold),
+                opportunistic=use_opportunistic, switch_iteration=int(switch_iteration),
                 loss=loss, source=source, seed=int(seed),
             )
             return adv_image, pert_image, conf_graph, result
@@ -832,7 +738,7 @@ def create_demo_interface():
             fn=execute_attack,
             inputs=[image_input, method_dropdown, epsilon_slider, max_iter_slider,
                     model_dropdown, loss_radio, attack_mode, target_class_number,
-                    opportunistic_checkbox, stability_threshold_slider,
+                    opportunistic_checkbox, switch_iteration_slider,
                     model_source_radio, seed_slider],
             outputs=[adversarial_output, perturbation_output, confidence_graph_output, result_text]
         )
@@ -843,7 +749,6 @@ def create_demo_interface():
             choices = list(ROBUSTBENCH_MODELS.keys()) if is_robust else STANDARD_MODELS
             default = choices[0]
             source = 'robust' if is_robust else 'standard'
-            stability_default = 10 if is_robust else 5
             if current_image is not None:
                 try:
                     label, confidence, _ = predict_image(current_image, default, source=source)
@@ -852,29 +757,14 @@ def create_demo_interface():
                     pred_text = f"Error: {str(e)}"
             else:
                 pred_text = ""
-            return gr.Dropdown(choices=choices, value=default), pred_text, gr.update(value=stability_default)
+            return gr.Dropdown(choices=choices, value=default), pred_text
 
         model_source_radio.change(
             fn=on_source_change,
             inputs=[model_source_radio, image_input],
-            outputs=[model_dropdown, result_text, stability_threshold_slider]
+            outputs=[model_dropdown, result_text]
         )
 
-        # Example images
-        gr.Markdown("### Example Images")
-        example_images = []
-        example_dir = os.path.join(project_root, "data")
-        if os.path.exists(example_dir):
-            for filename in os.listdir(example_dir):
-                if filename.lower().endswith(('.jpg', '.jpeg', '.png', '.webp')):
-                    example_images.append(os.path.join(example_dir, filename))
-        
-        if example_images:
-            gr.Examples(
-                examples=example_images,
-                inputs=image_input,
-                label="Click to load example"
-            )
     
     return demo
 
