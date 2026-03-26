@@ -16,8 +16,9 @@
 \title{Opportunistic Target Selection: Early Directional Commitment for Query-Efficient Black-Box Adversarial Attacks}
 
 \author[1]{Florent Tariolle}
-\author[1]{Florian Yger}
-\affil[1]{INSA Rouen Normandie}
+\author[1,2]{Florian Yger}
+\affil[1]{INSA Rouen Normandy}
+\affil[2]{LITIS}
 
 \begin{document}
 
@@ -72,7 +73,7 @@ Let $f: \mathcal{X} \to \mathbb{R}^K$ denote a classifier mapping inputs to logi
 
 Standard untargeted attacks minimize a loss that depends only on the true class:
 \begin{equation}
-\mathcal{L}_{\text{untarg.}}(x', y) = P(y | x') \;\text{(SimBA)} \quad \text{or} \quad -\log P(y | x') \;\text{(CE)}
+\mathcal{L}_{\text{untarg.}}(x', y) = P(y | x') \;\text{(SimBA)} \quad \text{or} \quad \log P(y | x') \;\text{(CE)}
 \end{equation}
 These objectives decrease $P(y|x')$ without specifying where the freed probability mass should concentrate. We call this \textit{class drift}. \textbf{Margin loss} avoids drift by construction:
 \begin{equation}
@@ -94,21 +95,17 @@ OTS discovers the target class online by observing which adversarial class the p
 \caption{Opportunistic Target Selection (Rank-Stability Variant)}
 \label{alg:ot}
 \begin{algorithmic}[1]
-\Require image $x$, true label $y$, attack $A$, stability threshold $S$
+\Require image $x$, true label $y$, attack $A$, threshold $S$
 \Ensure adversarial example $x'$
-\State $x' \leftarrow x$, $\textit{locked} \leftarrow \text{False}$, $\textit{target} \leftarrow \text{None}$, $\textit{candidate} \leftarrow \text{None}$, $\textit{streak} \leftarrow 0$
-\While{not misclassified($x'$) and budget not exhausted}
-    \State $\textit{mode} \leftarrow \text{targeted if } \textit{locked} \text{ else untargeted}$
-    \State $x' \leftarrow A.\text{step}(x', y \text{ if not } \textit{locked} \text{ else } \textit{target}, \textit{mode})$
-    \If{step was accepted}
-        \State $c \leftarrow \arg\max_{k \neq y} P(k | x')$
-        \If{not \textit{locked}}
-            \If{$c = \textit{candidate}$} $\textit{streak} \leftarrow \textit{streak} + 1$
-            \Else{} $\textit{candidate} \leftarrow c$; $\textit{streak} \leftarrow 1$
-            \EndIf
-            \If{$\textit{streak} = S$} $\textit{target} \leftarrow \textit{candidate}$; $\textit{locked} \leftarrow \text{True}$
-            \EndIf
-        \EndIf
+\State $x' \leftarrow x$;\; $t \leftarrow \bot$;\; $c \leftarrow \bot$;\; $s \leftarrow 0$
+\While{$\arg\max_k P(k|x') = y$ \textbf{and} budget remaining}
+    \If{$t = \bot$}
+        \State $x' \leftarrow A.\text{step}(x', y)$
+        \State $\ell \leftarrow \arg\max_{k \neq y} P(k|x')$
+        \If{$\ell = c$} $s \leftarrow s + 1$ \Else{} $c \leftarrow \ell$;\; $s \leftarrow 1$ \EndIf
+        \If{$s \geq S$} $t \leftarrow c$ \EndIf
+    \Else
+        \State $x' \leftarrow A.\text{step}(x', t)$
     \EndIf
 \EndWhile
 \State \Return $x'$
@@ -119,7 +116,7 @@ Once a target is locked, the attack commits for the remainder of the budget (\te
 
 \subsection{Attack Integration}\label{sec:integration}
 
-\textbf{SimBA.} We use the DCT basis with $8\times8$ blocks, $\epsilon = 8/255$ in $L_\infty$, and a 10,000-query budget. In untargeted mode, SimBA reduces $P(y|x')$; upon lock-in, the criterion switches to increasing $P(t|x')$. The perturbation mechanism is unchanged.
+\textbf{SimBA.} We use the DCT basis with $8\times8$ blocks, $\epsilon = 8/255$ in $L_\infty$, and a 10,000-iteration budget. In untargeted mode, SimBA reduces $P(y|x')$; upon lock-in, the criterion switches to increasing $P(t|x')$. The perturbation mechanism is unchanged.
 
 \textbf{Square Attack (CE loss).} We deliberately run Square Attack with cross-entropy loss rather than its default margin loss to isolate OTS's contribution: margin loss already provides implicit target tracking (Section~\ref{sec:drift}), which would confound OTS's effect. Budget is $N = 10{,}000$ iterations; the patch schedule depends on $N$, so all experiments use a fixed $N$ for comparability.
 
@@ -134,7 +131,7 @@ Once a target is locked, the attack commits for the remainder of the budget (\te
 
 \textbf{Configuration.} Perturbation budget $\epsilon = 8/255$ ($L_\infty$). Iteration budget: 10,000 (main benchmark) and 15,000 (extended benchmark). Each iteration corresponds to one model query for Square Attack and Bandits. SimBA uses two queries per iteration (one per sign direction), averaging 1.4--1.5 effective queries per iteration after early rejection. All budgets and iteration counts reported in this paper refer to iterations, not raw queries. Stability thresholds: $S = 10$ (SimBA), $S = 8$ (Square Attack) on standard models; $S = 10$ for both on robust models.
 
-\textbf{Images.} 100 images randomly sampled from ILSVRC2012 validation (seed 42). Each combination uses a single attack random seed (seed 0), yielding 4,500 runs on standard models. A separate multi-seed validation (5 seeds) confirms seed independence (Section~\ref{sec:limitations}).
+\textbf{Images.} 100 images randomly sampled from ILSVRC2012 validation (seed 42). Each combination uses a single attack random seed (seed 0), yielding 4,500 runs on standard models. A separate multi-seed validation (5 seeds) confirms seed independence (Figure~\ref{fig:multiseed}).
 
 \textbf{Metrics.} Primary: \textit{success rate} at equal query budgets. We also report \textit{success rate vs.\ query budget} (CDF curves) following \citet{ughi2021empirical}. Secondary: \textit{censored mean iterations} (failed runs are assigned the budget ceiling as cost, so the metric penalizes both slow convergence and outright failure) and \textit{paired mean iterations} (restricted to images where both modes succeed, isolating pure efficiency). Censoring biases \emph{against} OTS, making savings estimates conservative.
 
@@ -143,9 +140,27 @@ Once a target is locked, the attack commits for the remainder of the budget (\te
 
 \subsection{Success Rates}\label{sec:success-rates}
 
-Across 4,500 runs, OTS closely tracks oracle-targeted success rates for random-search attacks. SimBA improves from 67\% untargeted to 75\% OTS (oracle: 76\%), with the largest gain on ResNet-50: 43\% $\to$ 70\% (+27~pp). Square Attack (CE) improves from 96.2\% to 97.6\% (oracle: 99\%). Per-model gains concentrate on harder models: ResNet-50 (81\% $\to$ 94\%, +13~pp) and ViT-B/16 (100\% in all modes, but OTS reduces the censored mean by 16\%). Easier models (AlexNet, VGG-16, ResNet-18) show floor effects with near-perfect success rates regardless of mode.
+\begin{table}[H]
+\centering
+\caption{Success rates (\%) by model and attack mode (100 images per model, 10K budget).}
+\label{tab:success-rates}
+\small
+\begin{tabular}{@{}l ccc ccc ccc@{}}
+\toprule
+& \multicolumn{3}{c}{SimBA} & \multicolumn{3}{c}{Square Attack (CE)} & \multicolumn{3}{c}{Bandits} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10}
+Model & Unt. & OTS & Orac. & Unt. & OTS & Orac. & Unt. & OTS & Orac. \\
+\midrule
+AlexNet    & 77 & 78 & 78 & 100 & 100 & 100 & 47 & 46 & 47 \\
+ResNet-18  & 85 & 90 & 93 & 100 & 100 & 100 & 37 & 35 & 33 \\
+VGG-16     & 84 & 85 & 89 & 100 & 100 & 100 & 49 & 41 & 43 \\
+ResNet-50  & 43 & 70 & 70 &  81 &  94 &  95 & 25 & 24 & 25 \\
+ViT-B/16   & 46 & 52 & 51 & 100 & 100 & 100 & 28 & 24 & 25 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-Bandits shows no benefit from OTS and can be actively harmed: success rates are flat or lower across all models, with an 8~pp degradation on VGG-16 (49\% $\to$ 41\%). Even oracle-targeted Bandits provides no improvement, confirming that gradient estimation already provides the directionality OTS adds. The degradation likely arises because locking a target redirects the loss away from the landscape the gradient estimator's data-dependent prior was trained to follow, effectively fighting its own directional signal.
+Table~\ref{tab:success-rates} reports success rates across 4,500 runs (pooled: SimBA 67/75/76\%, Square Attack 96/99/99\%, Bandits 37/34/35\% for Unt./OTS/Orac.). For SimBA and Square Attack (CE), OTS closely tracks oracle performance. The largest gains appear on ResNet-50: +27~pp for SimBA (43\% $\to$ 70\%) and +13~pp for Square Attack (81\% $\to$ 94\%). Easier models (AlexNet, VGG-16, ResNet-18) show floor effects with near-perfect rates regardless of mode. Bandits shows no benefit from OTS and is occasionally harmed (VGG-16: 49\% $\to$ 41\%), confirming that gradient estimation already provides the directionality OTS adds.
 
 \begin{figure}[ht]
 \centering
@@ -158,7 +173,7 @@ Bandits shows no benefit from OTS and can be actively harmed: success rates are 
 
 All Wilcoxon tests are two-sided signed-rank tests with Bonferroni correction across models.
 
-\textbf{Censored mean} (failed = 10K ceiling). SimBA: OTS reduces the censored mean by 4.8\% (5,426 $\to$ 5,164). Square Attack (CE): 29.5\% reduction (1,076 $\to$ 759), largely driven by converting failures to successes rather than faster convergence on already-successful runs. Bandits: slight increase of 3.7\% (3,254 $\to$ 3,374). SimBA and Square Attack show highly significant pooled Wilcoxon tests ($p < 10^{-9}$, Bonferroni-corrected). For Square Attack, per-model significance concentrates on ResNet-50 and ViT-B/16; easy models show floor effects ($<$100 iterations regardless of mode). For Bandits, no comparison reaches significance.
+\textbf{Censored mean} (failed runs assigned their respective budget ceiling). SimBA: OTS reduces the censored mean by 4.8\% (5,426 $\to$ 5,164). Square Attack (CE): 29.5\% reduction (1,076 $\to$ 759), largely driven by converting failures to successes rather than faster convergence on already-successful runs. Bandits: slight increase of 3.7\% (3,254 $\to$ 3,374). SimBA and Square Attack show highly significant pooled Wilcoxon tests ($p < 10^{-9}$, Bonferroni-corrected). For Square Attack, per-model significance concentrates on ResNet-50 and ViT-B/16; easy models show floor effects ($<$100 iterations regardless of mode). For Bandits, no comparison reaches significance.
 
 \begin{figure}[ht]
 \centering
@@ -238,12 +253,8 @@ Two further ablations isolate what drives OTS's benefit. First, \textbf{targetin
 
 A \textbf{target-class overlap analysis} (Figure~\ref{fig:target-overlap}) clarifies why: SimBA locks onto the clean-image top-1 in 100\% of runs (small coordinate perturbations preserve the ranking), while Square Attack shows lower overlap (64\% at top-1) because random patches are more disruptive. This explains why exploration helps Square Attack but not SimBA.
 
-\subsection*{Limitations}\label{sec:limitations}
-(1)~Only two robust models were tested ($L_\infty$ adversarial training); other defenses may differ. \newline
-(2)~All experiments use ImageNet ($K = 1000$), the regime where class drift is most acute; the benefit may diminish with fewer classes.
-
-\subsection*{Future Work}
-Testing on settings where switch timing may matter more (larger $\epsilon$, CIFAR-10 with $K=10$) is a natural next step. An adaptive re-locking variant that releases the lock when the locked class drops in ranking could recover from bad early commits, and evaluating OTS under $L_2$ budgets would probe whether drift dynamics differ with smoother perturbations.
+\subsection*{Limitations and Future Work}\label{sec:limitations}
+Two main limitations should be noted. First, our evaluation on robust models is restricted to two architectures trained under an $L_\infty$ adversarial setting, and the observed behavior may not generalize to other defense mechanisms such as randomized smoothing or input transformations. Second, all experiments are conducted on ImageNet ($K = 1{,}000$), a regime where class drift is particularly pronounced due to the large number of alternative classes; as a result, the benefits of OTS may be reduced in settings with fewer classes where the probability mass has less room to scatter. Natural extensions include testing on CIFAR-10 ($K=10$) and under $L_2$ budgets to probe whether drift dynamics differ, as well as an adaptive re-locking variant that releases the lock when the locked class drops in ranking.
 \bibliography{references}
 
 % ============================================================================
@@ -287,7 +298,7 @@ Testing on settings where switch timing may matter more (larger $\epsilon$, CIFA
 \begin{table}[htbp]
 \centering
 \caption{Stability threshold sweep (ResNet-50, 100 images, 15K budget). Bold: selected $S$.}
-\label{tab:simba-s-sweep}\label{tab:square-s-sweep}
+\label{tab:s-sweep}
 \small
 \begin{tabular}{@{}llll@{\hspace{1.5em}}llll@{}}
 \toprule
