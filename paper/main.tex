@@ -9,6 +9,7 @@
 \usepackage{algpseudocode}
 \usepackage{xcolor}
 \usepackage{float}
+\usepackage{rotating}
 
 \bibliographystyle{apalike}
 
@@ -36,6 +37,7 @@ We validate OTS on three score-based attacks (SimBA, Square Attack with cross-en
 
 % ============================================================================
 \section{Introduction}\label{sec:introduction}
+\marginpar{\tiny\begin{turn}{90}\url{https://github.com/Tariolle/opportunistic-target-selection}\end{turn}}
 
 Standard untargeted black-box attacks minimize the model's confidence in the ground-truth class. This strategy, whether implemented as probability minimization in SimBA \citep{guo2019simple} or cross-entropy loss in Square Attack \citep{andriushchenko2020square}, treats all non-true classes as interchangeable. The freed probability mass spreads across remaining classes without directional commitment; the perturbation executes a random walk through the latent space, crossing class basins opportunistically rather than heading toward a specific decision boundary.
 
